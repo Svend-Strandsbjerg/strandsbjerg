@@ -1,0 +1,111 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  FAMILY
+}
+
+model User {
+  id            String      @id @default(cuid())
+  name          String?
+  email         String?     @unique
+  emailVerified DateTime?
+  image         String?
+  role          Role        @default(FAMILY)
+
+  accounts      Account[]
+  sessions      Session[]
+  votes         Vote[]
+  createdEvents FamilyEvent[] @relation("EventCreator")
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([sessionToken])
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+}
+
+model FamilyEvent {
+  id          String            @id @default(cuid())
+  title       String
+  description String
+  location    String?
+
+  createdById String
+  createdBy   User              @relation("EventCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  dateOptions EventDateOption[]
+
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+model EventDateOption {
+  id            String      @id @default(cuid())
+  eventId        String
+  event          FamilyEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  candidateDate  DateTime
+
+  votes          Vote[]
+
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+}
+
+model Vote {
+  id           String          @id @default(cuid())
+  userId       String
+  dateOptionId String
+
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dateOption   EventDateOption @relation(fields: [dateOptionId], references: [id], onDelete: Cascade)
+
+  createdAt    DateTime        @default(now())
+
+  @@unique([userId, dateOptionId])
+}
