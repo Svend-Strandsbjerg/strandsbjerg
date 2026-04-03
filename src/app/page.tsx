@@ -3,12 +3,12 @@ import Link from "next/link";
 import { Section } from "@/components/ui/section";
 
 const focusAreas = [
-  "SAP ABAP delivery in complex enterprise landscapes",
-  "Architecture decisions that lower long-term operational cost",
-  "Integration reliability across SAP and external platforms",
-  "Modernization paths built around maintainability and quality",
-  "Technical leadership that aligns business and engineering",
-  "Structured development practices for sustainable velocity",
+  "Enterprise-grade SAP ABAP delivery with clean, testable implementation",
+  "Architecture decisions that reduce complexity and future change cost",
+  "Reliable integration across SAP and surrounding business platforms",
+  "Maintainability as a non-negotiable quality attribute",
+  "Technical leadership through clear standards and pragmatic execution",
+  "Strong alignment between business outcomes and engineering design",
 ];
 
 export default function HomePage() {
@@ -18,24 +18,24 @@ export default function HomePage() {
         <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-muted/70 to-transparent" />
         <div className="relative space-y-8">
           <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground sm:text-sm">
-            Software Developer · SAP ABAP · Architecture Mindset
+            SAP ABAP Developer · Architecture Mindset
           </p>
           <h1 className="max-w-4xl text-3xl font-semibold leading-tight tracking-tight sm:text-5xl lg:text-6xl">
-            Building enterprise software that stays clear, reliable, and maintainable as complexity grows.
+            SAP ABAP solutions engineered for integration, maintainability, and long-term reliability.
           </h1>
           <p className="max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-            I design and deliver SAP-centric solutions with a focus on integration quality, code health, and practical
-            modernization. The result is software that supports delivery today and remains adaptable tomorrow.
+            I build and modernize SAP-centric systems where technical quality directly impacts business performance.
+            My focus is dependable integration, maintainable codebases, and architectural clarity that scales.
           </p>
           <div className="flex flex-wrap gap-3 pt-1">
             <Link
               href="/professional"
               className="rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-sm"
             >
-              Explore professional profile
+              View professional profile
             </Link>
             <Link href="/contact" className="rounded-full border border-border px-5 py-2.5 text-sm font-medium">
-              Start a conversation
+              Discuss your project
             </Link>
           </div>
         </div>
@@ -43,7 +43,7 @@ export default function HomePage() {
 
       <Section
         title="Core strengths"
-        subtitle="Focused capabilities that support architecture quality, dependable delivery, and long-term maintainability."
+        subtitle="Technical capabilities I prioritize to deliver robust SAP solutions and sustainable engineering outcomes."
       >
         <ul className="grid gap-3 sm:gap-4 md:grid-cols-2">
           {focusAreas.map((item) => (

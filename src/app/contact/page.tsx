@@ -8,7 +8,7 @@ export default function ContactPage() {
       <header className="space-y-3">
         <h1 className="text-3xl font-semibold tracking-tight sm:text-5xl">Contact</h1>
         <p className="max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-          For consulting opportunities, architecture discussions, or technical collaboration, feel free to reach out.
+          For SAP ABAP development, architecture advisory, or integration-focused collaboration, feel free to reach out.
         </p>
       </header>
 
@@ -32,7 +32,7 @@ export default function ContactPage() {
             <label htmlFor="message" className="block text-sm font-medium">
               Message
             </label>
-            <Textarea id="message" name="message" placeholder="Tell me briefly about your project or challenge." />
+            <Textarea id="message" name="message" placeholder="Share a short summary of your context, goals, or technical challenge." />
           </div>
 
           <Button type="button">Send message</Button>
