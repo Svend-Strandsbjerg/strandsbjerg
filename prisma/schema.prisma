@@ -23,7 +23,8 @@ model User {
   accounts      Account[]
   sessions      Session[]
   votes         Vote[]
-  createdEvents FamilyEvent[] @relation("EventCreator")
+  createdEvents FamilyEvent[]      @relation("EventCreator")
+  investments   InvestmentEntry[]  @relation("InvestmentCreator")
 
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
@@ -108,4 +109,34 @@ model Vote {
   createdAt    DateTime        @default(now())
 
   @@unique([userId, dateOptionId])
+}
+
+model HomePageContent {
+  singleton String   @id
+  headline  String
+  intro     String
+  sections  String[]
+  updatedAt DateTime @updatedAt
+}
+
+model ProfessionalPageContent {
+  singleton           String      @id
+  heroTitle           String
+  heroIntro           String
+  competencies        String[]
+  experienceHighlights String[]
+  focusAreas          Json
+  updatedAt           DateTime    @updatedAt
+}
+
+model InvestmentEntry {
+  id          String   @id @default(cuid())
+  name        String
+  amount      Decimal  @db.Decimal(14, 2)
+  investedOn  DateTime
+  type        String
+  createdById String
+  createdBy   User     @relation("InvestmentCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
