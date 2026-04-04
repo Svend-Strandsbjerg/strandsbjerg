@@ -10,6 +10,8 @@ const authSecret =
   process.env.AUTH_SECRET ??
   process.env.NEXTAUTH_SECRET ??
   (process.env.NODE_ENV === "development" ? "local-dev-auth-secret" : undefined);
+const hasGoogleOAuthCredentials = Boolean(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET);
+const hasResendCredentials = Boolean(process.env.AUTH_RESEND_KEY);
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: authSecret,
@@ -17,10 +19,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "database" },
   pages: { signIn: "/login" },
   providers: [
-    Google,
-    Resend({
-      from: process.env.AUTH_EMAIL_FROM ?? "noreply@example.com",
-    }),
+    ...(hasGoogleOAuthCredentials ? [Google] : []),
+    ...(hasResendCredentials
+      ? [
+          Resend({
+            from: process.env.AUTH_EMAIL_FROM ?? "noreply@example.com",
+          }),
+        ]
+      : []),
   ],
   callbacks: {
     session: async ({ session, user }) => {

@@ -66,6 +66,14 @@ npm run dev
 - Configure Resend (`AUTH_RESEND_KEY`, `AUTH_EMAIL_FROM`) for magic links.
 - `/familie` routes are protected through `middleware.ts`.
 
+### Google OAuth troubleshooting (`401: invalid_client`)
+
+- Ensure `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET` are set in the active environment (local `.env` or hosting platform variables).
+- In Google Cloud Console, verify the OAuth client still exists and is of type **Web application**.
+- Add the correct **Authorized redirect URI**:
+  - Local: `http://localhost:3000/api/auth/callback/google`
+  - Production: `https://<your-domain>/api/auth/callback/google`
+
 ## Vercel deployment notes
 
 1. Connect repository in Vercel.
