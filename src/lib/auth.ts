@@ -1,12 +1,13 @@
+import { PrismaAdapter } from "@auth/prisma-adapter";
+import type { Adapter } from "next-auth/adapters";
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import Resend from "next-auth/providers/resend";
-import { PrismaAdapter } from "@auth/prisma-adapter";
 
 import { prisma } from "@/lib/prisma";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: PrismaAdapter(prisma),
+  adapter: PrismaAdapter(prisma) as Adapter,
   session: { strategy: "database" },
   pages: { signIn: "/login" },
   providers: [
@@ -19,7 +20,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     session: async ({ session, user }) => {
       if (session.user) {
         session.user.id = user.id;
-        session.user.role = user.role;
+        session.user.role = user.role ?? "FAMILY";
       }
       return session;
     },
