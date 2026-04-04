@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 
-import { voteForEvent } from "@/app/familie/actions";
+import { voteForEvent } from "@/app/x7k2p9q4v1m8/actions";
 import { Button } from "@/components/ui/button";
 
 type VoteFormProps = {

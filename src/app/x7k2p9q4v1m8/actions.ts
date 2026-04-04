@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { auth } from "@/lib/auth";
+import { FAMILY_PRIVATE_BASE_PATH } from "@/lib/private-routes";
 import { prisma } from "@/lib/prisma";
 
 export async function createFamilyEvent(formData: FormData) {
@@ -11,6 +12,8 @@ export async function createFamilyEvent(formData: FormData) {
   if (!session?.user?.id) {
     throw new Error("Unauthorized");
   }
+
+  const userId = session.user.id;
 
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
@@ -31,14 +34,14 @@ export async function createFamilyEvent(formData: FormData) {
       title,
       description,
       location: location || null,
-      createdById: session.user.id,
+      createdById: userId,
       dateOptions: {
         create: dateOptions.map((date) => ({ candidateDate: date })),
       },
     },
   });
 
-  revalidatePath("/familie");
+  revalidatePath(FAMILY_PRIVATE_BASE_PATH);
 }
 
 export async function voteForEvent(formData: FormData) {
@@ -47,6 +50,8 @@ export async function voteForEvent(formData: FormData) {
   if (!session?.user?.id) {
     throw new Error("Unauthorized");
   }
+
+  const userId = session.user.id;
 
   const eventId = String(formData.get("eventId") ?? "");
   const selectedOptions = formData
@@ -60,7 +65,7 @@ export async function voteForEvent(formData: FormData) {
 
   await prisma.vote.deleteMany({
     where: {
-      userId: session.user.id,
+      userId,
       dateOption: {
         eventId,
       },
@@ -70,11 +75,11 @@ export async function voteForEvent(formData: FormData) {
   await prisma.vote.createMany({
     data: selectedOptions.map((dateOptionId) => ({
       dateOptionId,
-      userId: session.user.id,
+      userId,
     })),
     skipDuplicates: true,
   });
 
-  revalidatePath(`/familie/events/${eventId}`);
-  revalidatePath("/familie");
+  revalidatePath(`${FAMILY_PRIVATE_BASE_PATH}/events/${eventId}`);
+  revalidatePath(FAMILY_PRIVATE_BASE_PATH);
 }
