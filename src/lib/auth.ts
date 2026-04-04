@@ -6,7 +6,13 @@ import Resend from "next-auth/providers/resend";
 
 import { prisma } from "@/lib/prisma";
 
+const authSecret =
+  process.env.AUTH_SECRET ??
+  process.env.NEXTAUTH_SECRET ??
+  (process.env.NODE_ENV === "development" ? "local-dev-auth-secret" : undefined);
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  secret: authSecret,
   adapter: PrismaAdapter(prisma) as Adapter,
   session: { strategy: "database" },
   pages: { signIn: "/login" },
