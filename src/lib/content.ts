@@ -1,5 +1,10 @@
 import { prisma } from "@/lib/prisma";
 
+function getModelDelegate<T>(modelName: string) {
+  const delegate = (prisma as unknown as Record<string, unknown>)[modelName];
+  return delegate as T | undefined;
+}
+
 export type HomePageContent = {
   headline: string;
   intro: string;
@@ -64,7 +69,19 @@ export const defaultProfessionalContent: ProfessionalPageContent = {
 };
 
 export async function getHomeContent() {
-  const entry = await prisma.homePageContent.findUnique({ where: { singleton: "home" } });
+  const homePageContent = getModelDelegate<{
+    findUnique: (args: { where: { singleton: string } }) => Promise<{
+      headline: string;
+      intro: string;
+      sections: string[];
+    } | null>;
+  }>("homePageContent");
+
+  if (!homePageContent) {
+    return defaultHomeContent;
+  }
+
+  const entry = await homePageContent.findUnique({ where: { singleton: "home" } });
 
   if (!entry) {
     return defaultHomeContent;
@@ -78,7 +95,21 @@ export async function getHomeContent() {
 }
 
 export async function getProfessionalContent() {
-  const entry = await prisma.professionalPageContent.findUnique({ where: { singleton: "professional" } });
+  const professionalPageContent = getModelDelegate<{
+    findUnique: (args: { where: { singleton: string } }) => Promise<{
+      heroTitle: string;
+      heroIntro: string;
+      competencies: string[];
+      experienceHighlights: string[];
+      focusAreas: unknown;
+    } | null>;
+  }>("professionalPageContent");
+
+  if (!professionalPageContent) {
+    return defaultProfessionalContent;
+  }
+
+  const entry = await professionalPageContent.findUnique({ where: { singleton: "professional" } });
 
   if (!entry) {
     return defaultProfessionalContent;

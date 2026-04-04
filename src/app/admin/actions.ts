@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requireAdmin } from "@/lib/access";
-import { defaultHomeContent, defaultProfessionalContent } from "@/lib/content";
+import { defaultHomeContent, defaultProfessionalContent, type ProfessionalPageContent } from "@/lib/content";
 import { prisma } from "@/lib/prisma";
 
 export type AdminActionState = {
@@ -29,11 +29,25 @@ export async function saveHomeContent(_: AdminActionState, formData: FormData): 
   try {
     await requireAdmin();
 
+    const homePageContent = (prisma as unknown as Record<string, unknown>).homePageContent as
+      | {
+          upsert: (args: {
+            where: { singleton: string };
+            create: { singleton: string; headline: string; intro: string; sections: string[] };
+            update: { headline: string; intro: string; sections: string[] };
+          }) => Promise<unknown>;
+        }
+      | undefined;
+
+    if (!homePageContent) {
+      return { status: "error", message: "Database client is out of date. Run prisma generate and restart the server." };
+    }
+
     const headline = String(formData.get("headline") ?? "").trim() || defaultHomeContent.headline;
     const intro = String(formData.get("intro") ?? "").trim() || defaultHomeContent.intro;
     const sections = linesToList(formData.get("sections"), defaultHomeContent.sections);
 
-    await prisma.homePageContent.upsert({
+    await homePageContent.upsert({
       where: { singleton: "home" },
       create: { singleton: "home", headline, intro, sections },
       update: { headline, intro, sections },
@@ -52,6 +66,33 @@ export async function saveProfessionalContent(_: AdminActionState, formData: For
   try {
     await requireAdmin();
 
+    const professionalPageContent = (prisma as unknown as Record<string, unknown>).professionalPageContent as
+      | {
+          upsert: (args: {
+            where: { singleton: string };
+            create: {
+              singleton: string;
+              heroTitle: string;
+              heroIntro: string;
+              competencies: string[];
+              experienceHighlights: string[];
+              focusAreas: ProfessionalPageContent["focusAreas"];
+            };
+            update: {
+              heroTitle: string;
+              heroIntro: string;
+              competencies: string[];
+              experienceHighlights: string[];
+              focusAreas: ProfessionalPageContent["focusAreas"];
+            };
+          }) => Promise<unknown>;
+        }
+      | undefined;
+
+    if (!professionalPageContent) {
+      return { status: "error", message: "Database client is out of date. Run prisma generate and restart the server." };
+    }
+
     const heroTitle = String(formData.get("heroTitle") ?? "").trim() || defaultProfessionalContent.heroTitle;
     const heroIntro = String(formData.get("heroIntro") ?? "").trim() || defaultProfessionalContent.heroIntro;
     const competencies = linesToList(formData.get("competencies"), defaultProfessionalContent.competencies);
@@ -64,7 +105,7 @@ export async function saveProfessionalContent(_: AdminActionState, formData: For
       .map((title, index) => ({ title, body: focusBodies[index] ?? "" }))
       .filter((entry) => entry.title && entry.body);
 
-    await prisma.professionalPageContent.upsert({
+    await professionalPageContent.upsert({
       where: { singleton: "professional" },
       create: {
         singleton: "professional",
