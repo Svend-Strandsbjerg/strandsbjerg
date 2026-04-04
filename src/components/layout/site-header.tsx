@@ -2,10 +2,12 @@ import Link from "next/link";
 
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { auth, signIn, signOut } from "@/lib/auth";
+import { isEditModeEnabled } from "@/lib/edit-mode";
 import { PUBLIC_NAV_ITEMS } from "@/lib/utils";
 
 export async function SiteHeader() {
   const session = await auth();
+  const editModeEnabled = isEditModeEnabled();
 
   return (
     <header className="sticky top-0 z-30 border-b border-border/80 bg-background/90 backdrop-blur">
@@ -20,6 +22,11 @@ export async function SiteHeader() {
               {item.label}
             </Link>
           ))}
+          {editModeEnabled ? (
+            <Link href="/admin" className="rounded-full border border-border px-3 py-1.5 text-xs text-foreground transition hover:bg-muted">
+              Edit
+            </Link>
+          ) : null}
           <ThemeToggle />
           {session?.user ? (
             <form

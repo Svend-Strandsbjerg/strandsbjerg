@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 
@@ -73,30 +74,46 @@ export function AdminEditor({ homeContent, professionalContent }: AdminEditorPro
   return (
     <div ref={formRef} onInput={onInput} className="space-y-8 sm:space-y-10">
       <header className="space-y-3 rounded-3xl border border-border/80 bg-card p-6 shadow-sm sm:p-8">
-        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Admin content editor</h1>
+        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Website content editor</h1>
         <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-          Edit homepage and professional page content. Changes are saved directly to the database.
+          Update public website copy by section. Save changes when a section is ready.
         </p>
         {isDirty ? <p className="text-sm text-amber-600">You have unsaved changes.</p> : null}
+        <div className="flex flex-wrap gap-2 pt-1">
+          <a href="#home-content" className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground transition hover:text-foreground">
+            Home sections
+          </a>
+          <a
+            href="#professional-content"
+            className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground transition hover:text-foreground"
+          >
+            Professional sections
+          </a>
+        </div>
       </header>
 
-      <section className="rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-7">
+      <section id="home-content" className="rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-7">
         <div className="space-y-1">
-          <h2 className="text-xl font-semibold tracking-tight">Home page</h2>
-          <p className="text-sm text-muted-foreground">Update the hero copy and core strengths shown on the public homepage.</p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-xl font-semibold tracking-tight">Home page</h2>
+            <Link href="/" target="_blank" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
+              Preview page ↗
+            </Link>
+          </div>
+          <p className="text-sm text-muted-foreground">Edit each section shown on the public Home page.</p>
         </div>
 
         <form action={homeAction} className="mt-6 space-y-5">
           <div className="space-y-2">
-            <label className="text-sm font-medium">Headline</label>
+            <label className="text-sm font-medium">Section: Hero headline</label>
             <Input name="headline" defaultValue={homeContent.headline} required />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Intro paragraph</label>
+            <label className="text-sm font-medium">Section: Hero intro paragraph</label>
             <Textarea name="intro" defaultValue={homeContent.intro} required rows={5} className="leading-relaxed" />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Core strengths (one per line)</label>
+            <label className="text-sm font-medium">Section: Core strengths list (one per line)</label>
             <Textarea name="sections" defaultValue={homeContent.sections.join("\n")} required rows={9} className="leading-relaxed" />
           </div>
           <div className="flex items-center justify-between gap-3">
@@ -106,25 +123,30 @@ export function AdminEditor({ homeContent, professionalContent }: AdminEditorPro
         </form>
       </section>
 
-      <section className="rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-7">
+      <section id="professional-content" className="rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-7">
         <div className="space-y-1">
-          <h2 className="text-xl font-semibold tracking-tight">Professional page</h2>
-          <p className="text-sm text-muted-foreground">Maintain profile text, highlights, and focus areas.</p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-xl font-semibold tracking-tight">Professional page</h2>
+            <Link href="/professional" target="_blank" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
+              Preview page ↗
+            </Link>
+          </div>
+          <p className="text-sm text-muted-foreground">Edit each text section shown on the Professional page.</p>
         </div>
 
         <form action={professionalAction} className="mt-6 space-y-5">
           <div className="space-y-2">
-            <label className="text-sm font-medium">Hero title</label>
+            <label className="text-sm font-medium">Section: Hero title</label>
             <Input name="heroTitle" defaultValue={professionalContent.heroTitle} required />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Hero intro</label>
+            <label className="text-sm font-medium">Section: Hero intro paragraph</label>
             <Textarea name="heroIntro" defaultValue={professionalContent.heroIntro} required rows={5} className="leading-relaxed" />
           </div>
 
           <div className="grid gap-5 md:grid-cols-2">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Competencies (one per line)</label>
+              <label className="text-sm font-medium">Section: Competencies (one per line)</label>
               <Textarea
                 name="competencies"
                 defaultValue={professionalContent.competencies.join("\n")}
@@ -134,7 +156,7 @@ export function AdminEditor({ homeContent, professionalContent }: AdminEditorPro
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Experience highlights (one per line)</label>
+              <label className="text-sm font-medium">Section: Experience highlights (one per line)</label>
               <Textarea
                 name="experienceHighlights"
                 defaultValue={professionalContent.experienceHighlights.join("\n")}
@@ -146,15 +168,15 @@ export function AdminEditor({ homeContent, professionalContent }: AdminEditorPro
           </div>
 
           <div className="space-y-3">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Focus areas</h3>
+            <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Section group: Focus areas</h3>
             {professionalContent.focusAreas.map((area, index) => (
               <div key={`${area.title}-${index}`} className="rounded-2xl border border-border/80 bg-muted/20 p-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Title</label>
+                  <label className="text-sm font-medium">Focus area title</label>
                   <Input name="focusTitle" defaultValue={area.title} required />
                 </div>
                 <div className="mt-3 space-y-2">
-                  <label className="text-sm font-medium">Description</label>
+                  <label className="text-sm font-medium">Focus area description</label>
                   <Textarea name="focusBody" defaultValue={area.body} required rows={4} className="leading-relaxed" />
                 </div>
               </div>
