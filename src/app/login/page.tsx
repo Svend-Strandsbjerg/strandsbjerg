@@ -1,4 +1,5 @@
 import { signIn } from "@/lib/auth";
+import { FAMILY_PRIVATE_BASE_PATH } from "@/lib/private-routes";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,14 +9,14 @@ export default function LoginPage() {
     <div className="mx-auto max-w-md space-y-6 rounded-3xl border border-border/80 bg-card p-6 text-center shadow-sm sm:p-8">
       <h1 className="text-2xl font-semibold tracking-tight">Login required</h1>
       <p className="text-sm leading-relaxed text-muted-foreground">
-        Access to the family planning area is limited to authenticated users.
+        Access to private areas is limited to authenticated users.
       </p>
 
       <div className="space-y-3">
         <form
           action={async () => {
             "use server";
-            await signIn("google", { redirectTo: "/familie" });
+            await signIn("google", { redirectTo: FAMILY_PRIVATE_BASE_PATH });
           }}
         >
           <Button className="w-full" variant="outline">
@@ -28,7 +29,7 @@ export default function LoginPage() {
             "use server";
             const email = formData.get("email");
             if (typeof email === "string" && email.includes("@")) {
-              await signIn("resend", { email, redirectTo: "/familie" });
+              await signIn("resend", { email, redirectTo: FAMILY_PRIVATE_BASE_PATH });
             }
           }}
           className="space-y-2"

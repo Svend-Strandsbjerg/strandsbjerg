@@ -20,9 +20,6 @@ export async function SiteHeader() {
               {item.label}
             </Link>
           ))}
-          <Link href="/familie" className="transition hover:text-foreground">
-            Familie
-          </Link>
           <ThemeToggle />
           {session?.user ? (
             <form

@@ -2,9 +2,10 @@ import Link from "next/link";
 
 import { CreateEventForm } from "@/components/familie/create-event-form";
 import { auth } from "@/lib/auth";
+import { FAMILY_PRIVATE_BASE_PATH } from "@/lib/private-routes";
 import { prisma } from "@/lib/prisma";
 
-export default async function FamiliePage() {
+export default async function PrivatePlanningPage() {
   const session = await auth();
 
   const events = await prisma.familyEvent.findMany({
@@ -20,7 +21,7 @@ export default async function FamiliePage() {
   return (
     <div className="space-y-8 sm:space-y-10">
       <header className="space-y-3 rounded-3xl border border-border/80 bg-card p-6 shadow-sm sm:p-8">
-        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Familie planning</h1>
+        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Private planning</h1>
         <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
           Private collaboration space for simple event planning and date voting.
         </p>
@@ -43,7 +44,7 @@ export default async function FamiliePage() {
               return (
                 <Link
                   key={event.id}
-                  href={`/familie/events/${event.id}`}
+                  href={`${FAMILY_PRIVATE_BASE_PATH}/events/${event.id}`}
                   className="block rounded-2xl border border-border/80 bg-card p-5 shadow-sm transition hover:border-primary/50 hover:bg-muted/20"
                 >
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

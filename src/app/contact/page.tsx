@@ -1,48 +1,17 @@
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-
 export default function ContactPage() {
   return (
-    <div className="mx-auto max-w-4xl space-y-8 sm:space-y-10">
-      <header className="space-y-3">
-        <h1 className="text-3xl font-semibold tracking-tight sm:text-5xl">Contact</h1>
-        <p className="max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-          For SAP ABAP development, architecture advisory, or integration-focused collaboration, feel free to reach out.
-        </p>
-      </header>
-
-      <div className="rounded-3xl border border-border/80 bg-card p-6 shadow-sm sm:p-8">
-        <form className="space-y-5" aria-label="Contact form">
-          <div className="space-y-1.5">
-            <label htmlFor="name" className="block text-sm font-medium">
-              Name
-            </label>
-            <Input id="name" name="name" placeholder="Your name" autoComplete="name" />
-          </div>
-
-          <div className="space-y-1.5">
-            <label htmlFor="email" className="block text-sm font-medium">
-              Email
-            </label>
-            <Input id="email" name="email" type="email" placeholder="you@example.com" autoComplete="email" />
-          </div>
-
-          <div className="space-y-1.5">
-            <label htmlFor="message" className="block text-sm font-medium">
-              Message
-            </label>
-            <Textarea id="message" name="message" placeholder="Share a short summary of your context, goals, or technical challenge." />
-          </div>
-
-          <Button type="button">Send message</Button>
-        </form>
-      </div>
-
-      <div className="rounded-2xl border border-border/70 bg-muted/30 px-5 py-4 text-sm text-muted-foreground">
-        <p>Email: your.email@example.com</p>
-        <p className="mt-1">LinkedIn: linkedin.com/in/your-linkedin</p>
-      </div>
-    </div>
+    <section className="mx-auto max-w-3xl space-y-5 rounded-3xl border border-border/80 bg-card p-7 shadow-sm sm:p-10">
+      <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground sm:text-sm">Contact</p>
+      <h1 className="text-3xl font-semibold tracking-tight sm:text-5xl">Let&apos;s connect</h1>
+      <p className="text-base leading-relaxed text-muted-foreground sm:text-lg">
+        For software development, architecture advisory, or integration-focused collaboration, feel free to reach out.
+      </p>
+      <a
+        href="mailto:contact@example.com"
+        className="inline-flex rounded-full border border-border px-5 py-2.5 text-sm font-medium transition hover:bg-muted/50"
+      >
+        contact@example.com
+      </a>
+    </section>
   );
 }
