@@ -5,6 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 export default function LoginPage() {
+  const hasGoogleOAuthCredentials = Boolean(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET);
+  const hasResendCredentials = Boolean(process.env.AUTH_RESEND_KEY);
+
   return (
     <div className="mx-auto max-w-md space-y-6 rounded-3xl border border-border/80 bg-card p-6 text-center shadow-sm sm:p-8">
       <h1 className="text-2xl font-semibold tracking-tight">Login required</h1>
@@ -13,30 +16,42 @@ export default function LoginPage() {
       </p>
 
       <div className="space-y-3">
-        <form
-          action={async () => {
-            "use server";
-            await signIn("google", { redirectTo: FAMILY_PRIVATE_BASE_PATH });
-          }}
-        >
-          <Button className="w-full" variant="outline">
-            Continue with Google
-          </Button>
-        </form>
+        {hasGoogleOAuthCredentials ? (
+          <form
+            action={async () => {
+              "use server";
+              await signIn("google", { redirectTo: FAMILY_PRIVATE_BASE_PATH });
+            }}
+          >
+            <Button className="w-full" variant="outline">
+              Continue with Google
+            </Button>
+          </form>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Google sign-in is not configured on this deployment.
+          </p>
+        )}
 
-        <form
-          action={async (formData) => {
-            "use server";
-            const email = formData.get("email");
-            if (typeof email === "string" && email.includes("@")) {
-              await signIn("resend", { email, redirectTo: FAMILY_PRIVATE_BASE_PATH });
-            }
-          }}
-          className="space-y-2"
-        >
-          <Input type="email" name="email" required placeholder="you@example.com" />
-          <Button className="w-full">Send magic link</Button>
-        </form>
+        {hasResendCredentials ? (
+          <form
+            action={async (formData) => {
+              "use server";
+              const email = formData.get("email");
+              if (typeof email === "string" && email.includes("@")) {
+                await signIn("resend", { email, redirectTo: FAMILY_PRIVATE_BASE_PATH });
+              }
+            }}
+            className="space-y-2"
+          >
+            <Input type="email" name="email" required placeholder="you@example.com" />
+            <Button className="w-full">Send magic link</Button>
+          </form>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Magic link sign-in is not configured on this deployment.
+          </p>
+        )}
       </div>
     </div>
   );

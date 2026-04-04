@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { TopNavItemButton, TopNavItemLink } from "@/components/layout/top-nav-item";
 import { auth, signIn, signOut } from "@/lib/auth";
 import { isEditModeEnabled } from "@/lib/edit-mode";
 import { PUBLIC_NAV_ITEMS } from "@/lib/utils";
@@ -16,16 +17,14 @@ export async function SiteHeader() {
           STRANDSBJERG
         </Link>
 
-        <nav className="flex flex-wrap items-center justify-end gap-3 text-xs text-muted-foreground sm:gap-5 sm:text-sm">
+        <nav className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
           {PUBLIC_NAV_ITEMS.map((item) => (
-            <Link key={item.href} href={item.href} className="transition hover:text-foreground">
+            <TopNavItemLink key={item.href} href={item.href}>
               {item.label}
-            </Link>
+            </TopNavItemLink>
           ))}
           {editModeEnabled ? (
-            <Link href="/admin" className="rounded-full border border-border px-3 py-1.5 text-xs text-foreground transition hover:bg-muted">
-              Edit
-            </Link>
+            <TopNavItemLink href="/admin">Edit</TopNavItemLink>
           ) : null}
           <ThemeToggle />
           {session?.user ? (
@@ -35,9 +34,7 @@ export async function SiteHeader() {
                 await signOut({ redirectTo: "/" });
               }}
             >
-              <button type="submit" className="rounded-full border border-border px-3 py-1.5 text-xs">
-                Sign out
-              </button>
+              <TopNavItemButton type="submit">Sign out</TopNavItemButton>
             </form>
           ) : (
             <form
@@ -46,9 +43,7 @@ export async function SiteHeader() {
                 await signIn();
               }}
             >
-              <button type="submit" className="rounded-full border border-border px-3 py-1.5 text-xs">
-                Login
-              </button>
+              <TopNavItemButton type="submit">Login</TopNavItemButton>
             </form>
           )}
         </nav>
