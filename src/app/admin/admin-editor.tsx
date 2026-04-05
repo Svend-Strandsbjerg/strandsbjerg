@@ -9,6 +9,7 @@ import {
   saveHomeContent,
   saveProfessionalContent,
   setUserApprovalStatus,
+  setUserPassword,
   setUserRole,
   type AdminActionState,
 } from "@/app/admin/actions";
@@ -55,6 +56,7 @@ export function AdminEditor({ homeContent, professionalContent, users, currentAd
   const [professionalState, professionalAction] = useActionState(saveProfessionalContent, initialAdminActionState);
   const [approvalState, approvalAction] = useActionState(setUserApprovalStatus, initialAdminActionState);
   const [roleState, roleAction] = useActionState(setUserRole, initialAdminActionState);
+  const [passwordState, passwordAction] = useActionState(setUserPassword, initialAdminActionState);
 
   const [isDirty, setIsDirty] = useState(false);
   const formRef = useRef<HTMLDivElement>(null);
@@ -78,17 +80,19 @@ export function AdminEditor({ homeContent, professionalContent, users, currentAd
       homeState.status === "success" ||
       professionalState.status === "success" ||
       approvalState.status === "success" ||
-      roleState.status === "success"
+      roleState.status === "success" ||
+      passwordState.status === "success"
     ) {
       setIsDirty(false);
     }
-  }, [homeState.status, professionalState.status, approvalState.status, roleState.status]);
+  }, [homeState.status, professionalState.status, approvalState.status, roleState.status, passwordState.status]);
 
   const onInput = () => {
     setIsDirty(true);
   };
 
-  const userManagementState = approvalState.status !== "idle" ? approvalState : roleState;
+  const userManagementState =
+    passwordState.status !== "idle" ? passwordState : approvalState.status !== "idle" ? approvalState : roleState;
 
   return (
     <div ref={formRef} onInput={onInput} className="space-y-8 sm:space-y-10">
@@ -270,6 +274,33 @@ export function AdminEditor({ homeContent, professionalContent, users, currentAd
                           Set role
                         </Button>
                       </form>
+                      <details className="rounded-md border border-border/70 bg-muted/10 px-3 py-2">
+                        <summary className="cursor-pointer text-xs font-medium text-muted-foreground">Set new password</summary>
+                        <form action={passwordAction} className="mt-2 flex flex-wrap items-center gap-2">
+                          <input type="hidden" name="userId" value={user.id} />
+                          <Input
+                            type="password"
+                            name="newPassword"
+                            required
+                            minLength={8}
+                            placeholder="New password"
+                            autoComplete="new-password"
+                            className="h-9 w-40"
+                          />
+                          <Input
+                            type="password"
+                            name="confirmPassword"
+                            required
+                            minLength={8}
+                            placeholder="Confirm password"
+                            autoComplete="new-password"
+                            className="h-9 w-40"
+                          />
+                          <Button type="submit" variant="outline">
+                            Save password
+                          </Button>
+                        </form>
+                      </details>
                     </div>
                   </td>
                 </tr>
