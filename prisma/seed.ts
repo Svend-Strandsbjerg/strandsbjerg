@@ -1,4 +1,4 @@
-import { PrismaClient, Role } from "@prisma/client";
+import { ApprovalStatus, PrismaClient, Role } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -10,6 +10,7 @@ async function main() {
       email: "family@example.com",
       name: "Family Demo User",
       role: Role.FAMILY,
+      approvalStatus: ApprovalStatus.APPROVED,
     },
   });
 

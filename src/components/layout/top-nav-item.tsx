@@ -7,7 +7,7 @@ const topNavItemClasses =
   "inline-flex h-10 items-center justify-center rounded-full px-4 text-sm font-medium leading-none text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground active:bg-muted/70 active:text-foreground";
 
 type TopNavItemLinkProps = {
-  href: string;
+  href: ComponentPropsWithoutRef<typeof Link>["href"];
   children: ReactNode;
   className?: string;
 };

@@ -1,12 +1,13 @@
 import { notFound } from "next/navigation";
 
 import { VoteForm } from "@/components/familie/vote-form";
-import { auth } from "@/lib/auth";
+import { requireApprovedFamilyUser } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
 export default async function FamilyEventDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const session = await auth();
+  const user = await requireApprovedFamilyUser();
 
   const event = await prisma.familyEvent.findUnique({
     where: { id },
@@ -36,7 +37,7 @@ export default async function FamilyEventDetailPage({ params }: { params: Promis
 
   const selectedOptionIds =
     event.dateOptions
-      .filter((option) => option.votes.some((vote) => vote.userId === session?.user?.id))
+      .filter((option) => option.votes.some((vote) => vote.userId === user.id))
       .map((option) => option.id) ?? [];
 
   return (

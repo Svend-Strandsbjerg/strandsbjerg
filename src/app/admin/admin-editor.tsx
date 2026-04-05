@@ -8,6 +8,8 @@ import {
   initialAdminActionState,
   saveHomeContent,
   saveProfessionalContent,
+  setUserApprovalStatus,
+  setUserRole,
   type AdminActionState,
 } from "@/app/admin/actions";
 import { Button } from "@/components/ui/button";
@@ -18,6 +20,14 @@ import type { HomePageContent, ProfessionalPageContent } from "@/lib/content";
 type AdminEditorProps = {
   homeContent: HomePageContent;
   professionalContent: ProfessionalPageContent;
+  users: Array<{
+    id: string;
+    email: string | null;
+    role: "ADMIN" | "FAMILY" | "USER";
+    approvalStatus: "PENDING" | "APPROVED" | "REJECTED";
+    createdAt: Date;
+  }>;
+  currentAdminUserId?: string | null;
 };
 
 function SubmitButton({ label }: { label: string }) {
@@ -40,9 +50,11 @@ function StatusMessage({ state }: { state: AdminActionState }) {
   );
 }
 
-export function AdminEditor({ homeContent, professionalContent }: AdminEditorProps) {
+export function AdminEditor({ homeContent, professionalContent, users, currentAdminUserId }: AdminEditorProps) {
   const [homeState, homeAction] = useActionState(saveHomeContent, initialAdminActionState);
   const [professionalState, professionalAction] = useActionState(saveProfessionalContent, initialAdminActionState);
+  const [approvalState, approvalAction] = useActionState(setUserApprovalStatus, initialAdminActionState);
+  const [roleState, roleAction] = useActionState(setUserRole, initialAdminActionState);
 
   const [isDirty, setIsDirty] = useState(false);
   const formRef = useRef<HTMLDivElement>(null);
@@ -62,14 +74,21 @@ export function AdminEditor({ homeContent, professionalContent }: AdminEditorPro
   }, [isDirty]);
 
   useEffect(() => {
-    if (homeState.status === "success" || professionalState.status === "success") {
+    if (
+      homeState.status === "success" ||
+      professionalState.status === "success" ||
+      approvalState.status === "success" ||
+      roleState.status === "success"
+    ) {
       setIsDirty(false);
     }
-  }, [homeState.status, professionalState.status]);
+  }, [homeState.status, professionalState.status, approvalState.status, roleState.status]);
 
   const onInput = () => {
     setIsDirty(true);
   };
+
+  const userManagementState = approvalState.status !== "idle" ? approvalState : roleState;
 
   return (
     <div ref={formRef} onInput={onInput} className="space-y-8 sm:space-y-10">
@@ -88,6 +107,12 @@ export function AdminEditor({ homeContent, professionalContent }: AdminEditorPro
             className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground transition hover:text-foreground"
           >
             Professional sections
+          </a>
+          <a
+            href="#user-management"
+            className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground transition hover:text-foreground"
+          >
+            User management
           </a>
         </div>
       </header>
@@ -188,6 +213,70 @@ export function AdminEditor({ homeContent, professionalContent }: AdminEditorPro
             <SubmitButton label="Save professional content" />
           </div>
         </form>
+      </section>
+
+      <section id="user-management" className="rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-7">
+        <div className="space-y-1">
+          <h2 className="text-xl font-semibold tracking-tight">User management</h2>
+          <p className="text-sm text-muted-foreground">Approve or reject users and assign their role.</p>
+        </div>
+
+        <div className="mt-4">
+          <StatusMessage state={userManagementState} />
+        </div>
+
+        <div className="mt-5 overflow-x-auto">
+          <table className="w-full min-w-[760px] border-collapse text-left text-sm">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="py-2 pr-3 font-medium">Email</th>
+                <th className="py-2 pr-3 font-medium">Role</th>
+                <th className="py-2 pr-3 font-medium">Approval status</th>
+                <th className="py-2 pr-3 font-medium">Created at</th>
+                <th className="py-2 font-medium">Admin actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((user) => (
+                <tr key={user.id} className="border-b border-border/70 align-top">
+                  <td className="py-3 pr-3">{user.email ?? "No email"}</td>
+                  <td className="py-3 pr-3">{user.role.toLowerCase()}</td>
+                  <td className="py-3 pr-3">{user.approvalStatus.toLowerCase()}</td>
+                  <td className="py-3 pr-3">{user.createdAt.toISOString().slice(0, 10)}</td>
+                  <td className="py-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <form action={approvalAction}>
+                        <input type="hidden" name="userId" value={user.id} />
+                        <input type="hidden" name="approvalStatus" value="APPROVED" />
+                        <Button type="submit" variant="outline">
+                          Approve
+                        </Button>
+                      </form>
+                      <form action={approvalAction}>
+                        <input type="hidden" name="userId" value={user.id} />
+                        <input type="hidden" name="approvalStatus" value="REJECTED" />
+                        <Button type="submit" variant="outline">
+                          Reject
+                        </Button>
+                      </form>
+                      <form action={roleAction} className="flex items-center gap-2">
+                        <input type="hidden" name="userId" value={user.id} />
+                        <select name="role" defaultValue={user.role} className="h-9 rounded-md border border-input bg-background px-3 text-sm">
+                          <option value="USER">user</option>
+                          <option value="FAMILY">family</option>
+                          <option value="ADMIN">admin</option>
+                        </select>
+                        <Button type="submit" disabled={user.id === currentAdminUserId}>
+                          Set role
+                        </Button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
     </div>
   );

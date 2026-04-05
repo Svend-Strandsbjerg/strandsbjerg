@@ -1,12 +1,13 @@
 import Link from "next/link";
 
 import { CreateEventForm } from "@/components/familie/create-event-form";
-import { auth } from "@/lib/auth";
+import { requireApprovedFamilyUser } from "@/lib/access";
 import { FAMILY_PRIVATE_BASE_PATH } from "@/lib/private-routes";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
 export default async function PrivatePlanningPage() {
-  const session = await auth();
+  const user = await requireApprovedFamilyUser();
 
   const events = await prisma.familyEvent.findMany({
     orderBy: { createdAt: "desc" },
@@ -25,7 +26,7 @@ export default async function PrivatePlanningPage() {
         <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
           Private collaboration space for simple event planning and date voting.
         </p>
-        <p className="text-xs text-muted-foreground">Logged in as {session?.user?.email ?? "unknown user"}</p>
+        <p className="text-xs text-muted-foreground">Logged in as {user.email ?? "unknown user"}</p>
       </header>
 
       <CreateEventForm />

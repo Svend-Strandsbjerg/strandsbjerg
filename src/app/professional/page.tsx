@@ -2,6 +2,7 @@ import { PageContainer, PageHeader } from "@/components/ui/page-layout";
 import { Section } from "@/components/ui/section";
 import { getProfessionalContent } from "@/lib/content";
 
+export const dynamic = "force-dynamic";
 export default async function ProfessionalPage() {
   const content = await getProfessionalContent();
 
