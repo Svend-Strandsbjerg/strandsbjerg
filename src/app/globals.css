@@ -40,8 +40,16 @@ body {
 }
 
 @layer components {
-  .site-container {
+  .public-container {
     @apply mx-auto w-full max-w-6xl px-4 sm:px-6;
+  }
+
+  .site-container {
+    @apply public-container;
+  }
+
+  .public-main-shell {
+    @apply public-container flex-1 py-8 sm:py-12;
   }
 
   .page-content-stack {
@@ -62,6 +70,30 @@ body {
 
   .page-intro {
     @apply max-w-3xl text-base font-normal leading-relaxed text-muted-foreground sm:text-lg;
+  }
+
+  .public-intro-block {
+    @apply space-y-5 text-left;
+  }
+
+  .public-section-block {
+    @apply space-y-6 text-left;
+  }
+
+  .public-section-header {
+    @apply space-y-2;
+  }
+
+  .section-title {
+    @apply text-2xl font-semibold leading-tight tracking-tight sm:text-3xl;
+  }
+
+  .section-subtitle {
+    @apply max-w-3xl text-sm leading-relaxed text-muted-foreground sm:text-base;
+  }
+
+  .public-content-stack {
+    @apply space-y-4 sm:space-y-5;
   }
 
   .content-card {

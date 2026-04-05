@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 type ContainerProps = {
-  children: ReactNode;
+  children?: ReactNode;
   className?: string;
 };
 
@@ -32,7 +32,7 @@ export function PublicPageLayout({ children, className }: ContainerProps) {
 
 export function PageIntro({ eyebrow, title, intro, children, className }: PageIntroProps) {
   return (
-    <SectionContainer className={cn("space-y-5", className)}>
+    <SectionContainer className={cn("public-intro-block", className)}>
       {eyebrow ? <p className="page-eyebrow">{eyebrow}</p> : null}
       <h1 className="page-title">{title}</h1>
       {intro ? <p className="page-intro">{intro}</p> : null}
@@ -43,10 +43,10 @@ export function PageIntro({ eyebrow, title, intro, children, className }: PageIn
 
 export function SectionBlock({ title, subtitle, children, className }: SectionBlockProps) {
   return (
-    <SectionContainer className={cn("space-y-6", className)}>
-      <div className="space-y-2">
-        <h2 className="text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">{title}</h2>
-        {subtitle ? <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground sm:text-base">{subtitle}</p> : null}
+    <SectionContainer className={cn("public-section-block", className)}>
+      <div className="public-section-header">
+        <h2 className="section-title">{title}</h2>
+        {subtitle ? <p className="section-subtitle">{subtitle}</p> : null}
       </div>
       {children}
     </SectionContainer>
@@ -54,7 +54,7 @@ export function SectionBlock({ title, subtitle, children, className }: SectionBl
 }
 
 export function ContentContainer({ children, className }: ContainerProps) {
-  return <div className={cn("space-y-4 sm:space-y-5", className)}>{children}</div>;
+  return <div className={cn("public-content-stack", className)}>{children}</div>;
 }
 
 export const PageHeader = PageIntro;

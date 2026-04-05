@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { PublicContainer } from "@/components/layout/public-shell";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { TopNavItemButton, TopNavItemLink } from "@/components/layout/top-nav-item";
 import { isApprovedFamilyUser } from "@/lib/access";
@@ -14,7 +15,7 @@ export async function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-30 border-b border-border/80 bg-background/90 backdrop-blur">
-      <div className="site-container flex w-full flex-wrap items-center justify-between gap-3 py-4">
+      <PublicContainer className="flex w-full flex-wrap items-center justify-between gap-3 py-4">
         <Link href="/" className="text-xs font-semibold tracking-[0.16em] sm:text-sm">
           STRANDSBJERG
         </Link>
@@ -50,7 +51,7 @@ export async function SiteHeader() {
             </form>
           )}
         </nav>
-      </div>
+      </PublicContainer>
     </header>
   );
 }
