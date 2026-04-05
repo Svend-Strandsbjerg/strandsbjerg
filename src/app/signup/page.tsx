@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useActionState } from "react";
 
-import { initialSignupActionState, registerUser } from "@/app/signup/actions";
+import { registerUser } from "@/app/signup/actions";
+import { initialSignupActionState } from "@/app/signup/state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
