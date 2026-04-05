@@ -25,6 +25,22 @@ function fromSearchParams(searchParams?: SearchParams) {
   return Array.isArray(value) ? value[0] : value;
 }
 
+function isApprovedUser(user?: SessionUser | null) {
+  return Boolean(user?.id && user.approvalStatus === "APPROVED");
+}
+
+export function canAccessFamily(user?: SessionUser | null) {
+  return Boolean(isApprovedUser(user) && (user?.role === "FAMILY" || user?.role === "ADMIN"));
+}
+
+export function canAccessInvestments(user?: SessionUser | null) {
+  return Boolean(isApprovedUser(user) && user?.role === "ADMIN");
+}
+
+export function canAccessAdmin(user?: SessionUser | null) {
+  return Boolean(isApprovedUser(user) && user?.role === "ADMIN");
+}
+
 export async function requireUser() {
   const session = await auth();
 
@@ -35,15 +51,21 @@ export async function requireUser() {
   return session.user;
 }
 
-export function isApprovedFamilyUser(user?: SessionUser | null) {
-  return Boolean(user?.id && user.role === "FAMILY" && user.approvalStatus === "APPROVED");
-}
-
-export async function requireApprovedFamilyUser() {
+export async function requireFamilyAccessUser() {
   const user = await requireUser();
 
-  if (!isApprovedFamilyUser(user)) {
-    redirect("/login");
+  if (!canAccessFamily(user)) {
+    redirect("/login?state=restricted");
+  }
+
+  return user;
+}
+
+export async function requireInvestmentAccessUser() {
+  const user = await requireUser();
+
+  if (!canAccessInvestments(user)) {
+    redirect("/login?state=restricted");
   }
 
   return user;
@@ -84,7 +106,7 @@ export async function requireAdmin(searchParams?: SearchParams) {
 
   const user = await requireUser();
 
-  if (user.role !== "ADMIN") {
+  if (!canAccessAdmin(user)) {
     redirect("/");
   }
 

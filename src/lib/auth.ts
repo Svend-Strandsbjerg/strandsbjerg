@@ -27,6 +27,22 @@ function normalizeApprovalStatus(value: unknown): "PENDING" | "APPROVED" | "REJE
     : undefined;
 }
 
+function mapAuthMethod(provider?: string): "CREDENTIALS" | "GOOGLE" | "MAGIC_LINK" | "OAUTH" {
+  if (provider === "credentials") {
+    return "CREDENTIALS";
+  }
+
+  if (provider === "google") {
+    return "GOOGLE";
+  }
+
+  if (provider === "resend" || provider === "email") {
+    return "MAGIC_LINK";
+  }
+
+  return "OAUTH";
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: authSecret,
   adapter: PrismaAdapter(prisma) as Adapter,
@@ -120,6 +136,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.approvalStatus = normalizeApprovalStatus(token.approvalStatus);
       }
       return session;
+    },
+  },
+  events: {
+    signIn: async ({ user, account }) => {
+      if (!user.id) {
+        return;
+      }
+
+      try {
+        await prisma.loginActivity.create({
+          data: {
+            userId: user.id,
+            authMethod: mapAuthMethod(account?.provider),
+          },
+        });
+      } catch (error) {
+        console.error("Failed to record login activity", error);
+      }
     },
   },
 });

@@ -29,6 +29,7 @@ export async function registerUser(_: SignupActionState, formData: FormData): Pr
       update: {
         name: name || undefined,
         passwordHash,
+        passwordChangedAt: new Date(),
       },
       create: {
         email,
@@ -36,6 +37,7 @@ export async function registerUser(_: SignupActionState, formData: FormData): Pr
         passwordHash,
         role: Role.USER,
         approvalStatus: ApprovalStatus.PENDING,
+        passwordChangedAt: new Date(),
       },
     });
 
