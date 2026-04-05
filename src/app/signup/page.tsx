@@ -22,6 +22,7 @@ export default function SignupPage() {
       <form action={action} className="space-y-3">
         <Input name="name" placeholder="Name (optional)" />
         <Input type="email" name="email" required placeholder="you@example.com" />
+        <Input type="password" name="password" required minLength={8} placeholder="Create a password" />
         <Button type="submit" className="w-full" disabled={pending}>
           {pending ? "Creating account..." : "Sign up"}
         </Button>

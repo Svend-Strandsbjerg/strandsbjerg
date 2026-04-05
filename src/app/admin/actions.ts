@@ -5,6 +5,7 @@ import { ApprovalStatus, Role } from "@prisma/client";
 
 import { requireAdmin } from "@/lib/access";
 import { defaultHomeContent, defaultProfessionalContent, type ProfessionalPageContent } from "@/lib/content";
+import { hashPassword } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
 
 export type AdminActionState = {
@@ -179,5 +180,41 @@ export async function setUserRole(_: AdminActionState, formData: FormData): Prom
     return { status: "success", message: "User role updated." };
   } catch {
     return { status: "error", message: "Could not update user role." };
+  }
+}
+
+
+export async function setUserPassword(_: AdminActionState, formData: FormData): Promise<AdminActionState> {
+  try {
+    await requireAdmin();
+
+    const userId = String(formData.get("userId") ?? "");
+    const newPassword = String(formData.get("newPassword") ?? "");
+    const confirmPassword = String(formData.get("confirmPassword") ?? "");
+
+    if (!userId) {
+      return { status: "error", message: "Invalid password update request." };
+    }
+
+    if (newPassword.length < 8) {
+      return { status: "error", message: "Password must be at least 8 characters long." };
+    }
+
+    if (newPassword !== confirmPassword) {
+      return { status: "error", message: "Password confirmation does not match." };
+    }
+
+    const passwordHash = await hashPassword(newPassword);
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+    });
+
+    revalidatePath("/admin");
+
+    return { status: "success", message: "New password saved." };
+  } catch {
+    return { status: "error", message: "Could not set a new password." };
   }
 }
