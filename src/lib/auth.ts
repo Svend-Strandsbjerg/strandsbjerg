@@ -14,6 +14,18 @@ const authSecret =
   (process.env.NODE_ENV === "development" ? "local-dev-auth-secret" : undefined);
 const hasGoogleOAuthCredentials = Boolean(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET);
 const hasResendCredentials = Boolean(process.env.AUTH_RESEND_KEY);
+const APPROVAL_STATUSES = new Set(["PENDING", "APPROVED", "REJECTED"] as const);
+
+function normalizeApprovalStatus(value: unknown): "PENDING" | "APPROVED" | "REJECTED" | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const normalized = value.toUpperCase();
+  return APPROVAL_STATUSES.has(normalized as "PENDING" | "APPROVED" | "REJECTED")
+    ? (normalized as "PENDING" | "APPROVED" | "REJECTED")
+    : undefined;
+}
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: authSecret,
@@ -53,7 +65,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email: user.email,
           name: user.name,
           role: user.role,
-          approvalStatus: user.approvalStatus,
+          approvalStatus: normalizeApprovalStatus(user.approvalStatus),
         };
       },
     }),
@@ -69,11 +81,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     signIn: async ({ user, account }) => {
       if (account?.provider === "credentials") {
-        if (user.approvalStatus === "PENDING") {
+        const approvalStatus = normalizeApprovalStatus(user.approvalStatus);
+
+        if (approvalStatus === "PENDING") {
           return "/login?error=pending_approval";
         }
 
-        if (user.approvalStatus === "REJECTED") {
+        if (approvalStatus === "REJECTED") {
           return "/login?error=rejected_account";
         }
       }
@@ -84,7 +98,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.sub = user.id;
         token.role = user.role ?? "USER";
-        token.approvalStatus = user.approvalStatus ?? "PENDING";
+        token.approvalStatus = normalizeApprovalStatus(user.approvalStatus);
+      } else if (token.sub) {
+        const latestUser = await prisma.user.findUnique({
+          where: { id: token.sub },
+          select: { role: true, approvalStatus: true },
+        });
+
+        if (latestUser) {
+          token.role = latestUser.role;
+          token.approvalStatus = normalizeApprovalStatus(latestUser.approvalStatus);
+        }
       }
 
       return token;
@@ -93,7 +117,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (session.user) {
         session.user.id = token.sub ?? "";
         session.user.role = token.role ?? "USER";
-        session.user.approvalStatus = token.approvalStatus ?? "PENDING";
+        session.user.approvalStatus = normalizeApprovalStatus(token.approvalStatus);
       }
       return session;
     },
