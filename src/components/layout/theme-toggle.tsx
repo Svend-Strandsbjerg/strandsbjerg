@@ -16,7 +16,7 @@ export function ThemeToggle() {
 
   if (!mounted) {
     return (
-      <TopNavItemButton className="w-9 px-0" aria-label="Toggle dark mode">
+      <TopNavItemButton className="w-10 px-0" aria-label="Toggle dark mode">
         <MoonStar className="h-4 w-4" />
       </TopNavItemButton>
     );
@@ -27,7 +27,7 @@ export function ThemeToggle() {
   return (
     <TopNavItemButton
       onClick={() => setTheme(isDark ? "light" : "dark")}
-      className="w-9 px-0"
+      className="w-10 px-0"
       aria-label="Toggle dark mode"
     >
       {isDark ? <SunMedium className="h-4 w-4" /> : <MoonStar className="h-4 w-4" />}

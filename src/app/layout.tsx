@@ -18,7 +18,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
           <div className="flex min-h-screen flex-col">
             <SiteHeader />
-            <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-12">{children}</main>
+            <main className="site-container flex-1 py-8 sm:py-12">{children}</main>
             <SiteFooter />
           </div>
         </ThemeProvider>

@@ -12,7 +12,7 @@ export async function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-30 border-b border-border/80 bg-background/90 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
+      <div className="site-container flex w-full flex-wrap items-center justify-between gap-3 py-4">
         <Link href="/" className="text-xs font-semibold tracking-[0.16em] sm:text-sm">
           STRANDSBJERG
         </Link>

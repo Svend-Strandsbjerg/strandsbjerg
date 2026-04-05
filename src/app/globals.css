@@ -36,5 +36,35 @@ body {
 }
 
 body {
-  @apply bg-background text-foreground antialiased;
+  @apply bg-background font-sans text-base font-normal leading-relaxed text-foreground antialiased;
+}
+
+@layer components {
+  .site-container {
+    @apply mx-auto w-full max-w-6xl px-4 sm:px-6;
+  }
+
+  .page-content-stack {
+    @apply space-y-10 sm:space-y-12;
+  }
+
+  .section-surface {
+    @apply rounded-3xl border border-border/80 bg-card p-7 shadow-sm sm:p-10;
+  }
+
+  .page-eyebrow {
+    @apply text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground sm:text-sm;
+  }
+
+  .page-title {
+    @apply max-w-4xl text-3xl font-semibold leading-tight tracking-tight sm:text-5xl;
+  }
+
+  .page-intro {
+    @apply max-w-3xl text-base font-normal leading-relaxed text-muted-foreground sm:text-lg;
+  }
+
+  .content-card {
+    @apply rounded-2xl border border-border/80 bg-muted/40 px-5 py-4 text-sm leading-relaxed sm:text-base;
+  }
 }
