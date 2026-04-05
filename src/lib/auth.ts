@@ -18,7 +18,7 @@ const hasResendCredentials = Boolean(process.env.AUTH_RESEND_KEY);
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: authSecret,
   adapter: PrismaAdapter(prisma) as Adapter,
-  session: { strategy: "database" },
+  session: { strategy: "jwt" },
   pages: { signIn: "/login" },
   providers: [
     Credentials({
@@ -82,17 +82,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     jwt: async ({ token, user }) => {
       if (user) {
+        token.sub = user.id;
         token.role = user.role ?? "USER";
         token.approvalStatus = user.approvalStatus ?? "PENDING";
       }
 
       return token;
     },
-    session: async ({ session, user }) => {
+    session: async ({ session, token }) => {
       if (session.user) {
-        session.user.id = user.id;
-        session.user.role = user.role ?? "USER";
-        session.user.approvalStatus = user.approvalStatus ?? "PENDING";
+        session.user.id = token.sub ?? "";
+        session.user.role = token.role ?? "USER";
+        session.user.approvalStatus = token.approvalStatus ?? "PENDING";
       }
       return session;
     },
