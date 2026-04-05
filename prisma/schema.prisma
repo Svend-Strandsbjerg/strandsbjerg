@@ -10,6 +10,13 @@ datasource db {
 enum Role {
   ADMIN
   FAMILY
+  USER
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 model User {
@@ -18,7 +25,8 @@ model User {
   email         String?     @unique
   emailVerified DateTime?
   image         String?
-  role          Role        @default(FAMILY)
+  role          Role            @default(USER)
+  approvalStatus ApprovalStatus @default(PENDING)
 
   accounts      Account[]
   sessions      Session[]

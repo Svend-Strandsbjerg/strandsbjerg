@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { ApprovalStatus, Role } from "@prisma/client";
 
 import { requireAdmin } from "@/lib/access";
 import { defaultHomeContent, defaultProfessionalContent, type ProfessionalPageContent } from "@/lib/content";
@@ -130,5 +131,53 @@ export async function saveProfessionalContent(_: AdminActionState, formData: For
     return { status: "success", message: "Professional page content saved." };
   } catch {
     return { status: "error", message: "Could not save professional content. Please try again." };
+  }
+}
+
+export async function setUserApprovalStatus(_: AdminActionState, formData: FormData): Promise<AdminActionState> {
+  try {
+    await requireAdmin();
+
+    const userId = String(formData.get("userId") ?? "");
+    const status = String(formData.get("approvalStatus") ?? "");
+
+    if (!userId || !["PENDING", "APPROVED", "REJECTED"].includes(status)) {
+      return { status: "error", message: "Invalid approval update request." };
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { approvalStatus: status as ApprovalStatus },
+    });
+
+    revalidatePath("/admin");
+
+    return { status: "success", message: "User approval status updated." };
+  } catch {
+    return { status: "error", message: "Could not update user approval status." };
+  }
+}
+
+export async function setUserRole(_: AdminActionState, formData: FormData): Promise<AdminActionState> {
+  try {
+    await requireAdmin();
+
+    const userId = String(formData.get("userId") ?? "");
+    const role = String(formData.get("role") ?? "");
+
+    if (!userId || !["ADMIN", "FAMILY", "USER"].includes(role)) {
+      return { status: "error", message: "Invalid role assignment request." };
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { role: role as Role },
+    });
+
+    revalidatePath("/admin");
+
+    return { status: "success", message: "User role updated." };
+  } catch {
+    return { status: "error", message: "Could not update user role." };
   }
 }

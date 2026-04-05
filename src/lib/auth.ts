@@ -29,10 +29,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       : []),
   ],
   callbacks: {
+    jwt: async ({ token, user }) => {
+      if (user) {
+        token.role = user.role ?? "USER";
+        token.approvalStatus = user.approvalStatus ?? "PENDING";
+      }
+
+      return token;
+    },
     session: async ({ session, user }) => {
       if (session.user) {
         session.user.id = user.id;
-        session.user.role = user.role ?? "FAMILY";
+        session.user.role = user.role ?? "USER";
+        session.user.approvalStatus = user.approvalStatus ?? "PENDING";
       }
       return session;
     },

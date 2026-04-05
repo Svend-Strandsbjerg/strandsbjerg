@@ -2,8 +2,10 @@ import Link from "next/link";
 
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { TopNavItemButton, TopNavItemLink } from "@/components/layout/top-nav-item";
+import { isApprovedFamilyUser } from "@/lib/access";
 import { auth, signIn, signOut } from "@/lib/auth";
 import { isEditModeEnabled } from "@/lib/edit-mode";
+import { FAMILY_PRIVATE_BASE_PATH } from "@/lib/private-routes";
 import { PUBLIC_NAV_ITEMS } from "@/lib/utils";
 
 export async function SiteHeader() {
@@ -23,6 +25,7 @@ export async function SiteHeader() {
               {item.label}
             </TopNavItemLink>
           ))}
+          {isApprovedFamilyUser(session?.user) ? <TopNavItemLink href={FAMILY_PRIVATE_BASE_PATH}>Family</TopNavItemLink> : null}
           {editModeEnabled ? (
             <TopNavItemLink href="/admin">Edit</TopNavItemLink>
           ) : null}

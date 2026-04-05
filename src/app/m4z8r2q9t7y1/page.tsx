@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { requireUser } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
 export default async function InvestmentsPage() {
   await requireUser();
 

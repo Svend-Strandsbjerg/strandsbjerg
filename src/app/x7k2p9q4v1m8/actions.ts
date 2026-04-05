@@ -2,18 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 
-import { auth } from "@/lib/auth";
+import { requireApprovedFamilyUser } from "@/lib/access";
 import { FAMILY_PRIVATE_BASE_PATH } from "@/lib/private-routes";
 import { prisma } from "@/lib/prisma";
 
 export async function createFamilyEvent(formData: FormData) {
-  const session = await auth();
-
-  if (!session?.user?.id) {
-    throw new Error("Unauthorized");
-  }
-
-  const userId = session.user.id;
+  const user = await requireApprovedFamilyUser();
+  const userId = user.id;
 
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
@@ -45,13 +40,8 @@ export async function createFamilyEvent(formData: FormData) {
 }
 
 export async function voteForEvent(formData: FormData) {
-  const session = await auth();
-
-  if (!session?.user?.id) {
-    throw new Error("Unauthorized");
-  }
-
-  const userId = session.user.id;
+  const user = await requireApprovedFamilyUser();
+  const userId = user.id;
 
   const eventId = String(formData.get("eventId") ?? "");
   const selectedOptions = formData

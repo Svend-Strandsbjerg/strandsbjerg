@@ -14,6 +14,11 @@ import {
 } from "@/lib/edit-mode";
 
 type SearchParams = Record<string, string | string[] | undefined>;
+type SessionUser = {
+  id: string;
+  role?: "ADMIN" | "FAMILY" | "USER";
+  approvalStatus?: "PENDING" | "APPROVED" | "REJECTED";
+};
 
 function fromSearchParams(searchParams?: SearchParams) {
   const value = searchParams?.[EDIT_SECRET_QUERY_PARAM];
@@ -30,10 +35,24 @@ export async function requireUser() {
   return session.user;
 }
 
+export function isApprovedFamilyUser(user?: SessionUser | null) {
+  return Boolean(user?.id && user.role === "FAMILY" && user.approvalStatus === "APPROVED");
+}
+
+export async function requireApprovedFamilyUser() {
+  const user = await requireUser();
+
+  if (!isApprovedFamilyUser(user)) {
+    redirect("/login");
+  }
+
+  return user;
+}
+
 export async function requireAdmin(searchParams?: SearchParams) {
   if (isEditModeEnabled()) {
-    const requestHeaders = headers();
-    const cookieStore = cookies();
+    const requestHeaders = await headers();
+    const cookieStore = await cookies();
     const secretFromHeader = requestHeaders.get(EDIT_SECRET_HEADER);
     const secretFromQuery = fromSearchParams(searchParams);
     const hasValidSecret = isValidEditModeSecret(secretFromHeader) || isValidEditModeSecret(secretFromQuery);

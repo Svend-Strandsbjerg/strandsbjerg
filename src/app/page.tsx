@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Section } from "@/components/ui/section";
 import { getHomeContent } from "@/lib/content";
 
+export const dynamic = "force-dynamic";
 export default async function HomePage() {
   const content = await getHomeContent();
 
