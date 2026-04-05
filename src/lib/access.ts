@@ -1,6 +1,7 @@
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { canAccessAdminFromSubject, canAccessFamilyFromSubject, canAccessInvestmentsFromSubject } from "@/lib/access-rules";
 import { auth } from "@/lib/auth";
 import {
   EDIT_ACCESS_COOKIE,
@@ -25,20 +26,16 @@ function fromSearchParams(searchParams?: SearchParams) {
   return Array.isArray(value) ? value[0] : value;
 }
 
-function isApprovedUser(user?: SessionUser | null) {
-  return Boolean(user?.id && user.approvalStatus === "APPROVED");
-}
-
 export function canAccessFamily(user?: SessionUser | null) {
-  return Boolean(isApprovedUser(user) && (user?.role === "FAMILY" || user?.role === "ADMIN"));
+  return canAccessFamilyFromSubject(user);
 }
 
 export function canAccessInvestments(user?: SessionUser | null) {
-  return Boolean(isApprovedUser(user) && user?.role === "ADMIN");
+  return canAccessInvestmentsFromSubject(user);
 }
 
 export function canAccessAdmin(user?: SessionUser | null) {
-  return Boolean(isApprovedUser(user) && user?.role === "ADMIN");
+  return canAccessAdminFromSubject(user);
 }
 
 export async function requireUser() {
