@@ -1,71 +1,67 @@
-import { createInvestmentEntry } from "@/app/m4z8r2q9t7y1/actions";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { requireUser } from "@/lib/access";
-import { prisma } from "@/lib/prisma";
+import { SecurityType } from "@prisma/client";
+
+import { SecurityCreateForm, TransactionCreateForm } from "@/app/m4z8r2q9t7y1/components";
+import { getPortfolioData } from "@/app/m4z8r2q9t7y1/portfolio-data";
+import { SECURITY_TYPE_LABELS, formatAmount } from "@/lib/investments";
 
 export const dynamic = "force-dynamic";
-export default async function InvestmentsPage() {
-  await requireUser();
 
-  const entries = await prisma.investmentEntry.findMany({
-    orderBy: { investedOn: "desc" },
-  });
+export default async function InvestmentsOverviewPage() {
+  const { securities, holdings, totalInvested, typeBreakdown } = await getPortfolioData();
 
   return (
-    <div className="space-y-8 sm:space-y-10">
-      <header className="space-y-3 rounded-3xl border border-border/80 bg-card p-6 shadow-sm sm:p-8">
-        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Investments</h1>
-        <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-          Private overview of investment entries.
-        </p>
-      </header>
-
+    <div className="space-y-6 sm:space-y-8">
       <section className="rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-7">
-        <h2 className="text-xl font-semibold tracking-tight">Add entry</h2>
-        <form action={createInvestmentEntry} className="mt-5 grid gap-3 sm:grid-cols-2">
-          <Input name="name" placeholder="Name" required />
-          <Input name="type" placeholder="Type" required />
-          <Input name="amount" type="number" min="0.01" step="0.01" placeholder="Amount" required />
-          <Input name="investedOn" type="date" required />
-          <div className="sm:col-span-2">
-            <Button type="submit">Save entry</Button>
-          </div>
-        </form>
-      </section>
+        <h2 className="text-xl font-semibold tracking-tight">Portfolio overview</h2>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <article className="rounded-2xl border border-border/70 bg-muted/20 p-4">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Total invested</p>
+            <p className="mt-2 text-2xl font-semibold">{formatAmount(totalInvested)} (base)</p>
+          </article>
+          <article className="rounded-2xl border border-border/70 bg-muted/20 p-4">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Securities</p>
+            <p className="mt-2 text-2xl font-semibold">{securities.length}</p>
+          </article>
+          <article className="rounded-2xl border border-border/70 bg-muted/20 p-4">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Active holdings</p>
+            <p className="mt-2 text-2xl font-semibold">{holdings.length}</p>
+          </article>
+          <article className="rounded-2xl border border-border/70 bg-muted/20 p-4">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Categories used</p>
+            <p className="mt-2 text-2xl font-semibold">
+              {Object.values(SecurityType).filter((type) => typeBreakdown[type].securityCount > 0).length}
+            </p>
+          </article>
+        </div>
 
-      <section className="rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-7">
-        <h2 className="text-xl font-semibold tracking-tight">Overview</h2>
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[520px] border-collapse text-left text-sm">
+        <div className="mt-6 overflow-x-auto">
+          <table className="w-full min-w-[620px] border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-border">
-                <th className="py-2 pr-3 font-medium">Name</th>
-                <th className="py-2 pr-3 font-medium">Type</th>
-                <th className="py-2 pr-3 font-medium">Amount</th>
-                <th className="py-2 font-medium">Date</th>
+                <th className="py-2 pr-3 font-medium">Category</th>
+                <th className="py-2 pr-3 font-medium">Securities</th>
+                <th className="py-2 pr-3 font-medium">Holdings</th>
+                <th className="py-2 font-medium">Invested amount</th>
               </tr>
             </thead>
             <tbody>
-              {entries.map((entry) => (
-                <tr key={entry.id} className="border-b border-border/70">
-                  <td className="py-2 pr-3">{entry.name}</td>
-                  <td className="py-2 pr-3">{entry.type}</td>
-                  <td className="py-2 pr-3">{entry.amount.toFixed(2)}</td>
-                  <td className="py-2">{entry.investedOn.toISOString().slice(0, 10)}</td>
+              {Object.values(SecurityType).map((type) => (
+                <tr key={type} className="border-b border-border/70">
+                  <td className="py-2 pr-3">{SECURITY_TYPE_LABELS[type]}</td>
+                  <td className="py-2 pr-3">{typeBreakdown[type].securityCount}</td>
+                  <td className="py-2 pr-3">{typeBreakdown[type].holdingCount}</td>
+                  <td className="py-2">{formatAmount(typeBreakdown[type].investedAmount)}</td>
                 </tr>
               ))}
-              {entries.length === 0 ? (
-                <tr>
-                  <td className="py-3 text-muted-foreground" colSpan={4}>
-                    No entries yet.
-                  </td>
-                </tr>
-              ) : null}
             </tbody>
           </table>
         </div>
       </section>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <SecurityCreateForm />
+        <TransactionCreateForm securities={securities} />
+      </div>
     </div>
   );
 }
