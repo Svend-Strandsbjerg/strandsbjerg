@@ -1,14 +1,22 @@
-import { signIn } from "@/lib/auth";
-import { auth } from "@/lib/auth";
+import Link from "next/link";
+import { AuthError } from "next-auth";
+import { redirect } from "next/navigation";
+
 import { isApprovedFamilyUser } from "@/lib/access";
+import { auth, signIn } from "@/lib/auth";
 import { FAMILY_PRIVATE_BASE_PATH } from "@/lib/private-routes";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import Link from "next/link";
 
 type LoginPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+const loginErrors: Record<string, string> = {
+  invalid_credentials: "Invalid email or password.",
+  pending_approval: "Your account is pending approval.",
+  rejected_account: "Your account request was rejected.",
 };
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
@@ -18,6 +26,36 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const restrictedAccess = params?.state === "restricted";
   const hasGoogleOAuthCredentials = Boolean(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET);
   const hasResendCredentials = Boolean(process.env.AUTH_RESEND_KEY);
+  const authErrorKey = Array.isArray(params?.error) ? params?.error[0] : params?.error;
+
+  const credentialsSignIn = async (formData: FormData) => {
+    "use server";
+
+    const email = String(formData.get("email") ?? "")
+      .trim()
+      .toLowerCase();
+    const password = String(formData.get("password") ?? "");
+
+    if (!email || !password) {
+      redirect("/login?error=invalid_credentials");
+    }
+
+    try {
+      await signIn("credentials", {
+        email,
+        password,
+        redirectTo: "/login",
+      });
+    } catch (error) {
+      if (error instanceof AuthError) {
+        if (error.type === "CredentialsSignin") {
+          redirect("/login?error=invalid_credentials");
+        }
+      }
+
+      throw error;
+    }
+  };
 
   return (
     <div className="mx-auto max-w-md space-y-6 rounded-3xl border border-border/80 bg-card p-6 text-center shadow-sm sm:p-8">
@@ -25,6 +63,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       <p className="text-sm leading-relaxed text-muted-foreground">
         Access to private areas is limited to authenticated users.
       </p>
+      {authErrorKey && loginErrors[authErrorKey] ? (
+        <p className="rounded-2xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{loginErrors[authErrorKey]}</p>
+      ) : null}
       {session?.user ? (
         <div className="rounded-2xl border border-border/80 bg-muted/20 p-4 text-left text-sm">
           {isApprovedFamilyUser(session.user) ? (
@@ -44,6 +85,12 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       ) : null}
 
       <div className="space-y-3">
+        <form action={credentialsSignIn} className="space-y-2">
+          <Input type="email" name="email" required placeholder="you@example.com" autoComplete="email" />
+          <Input type="password" name="password" required placeholder="Password" autoComplete="current-password" />
+          <Button className="w-full">Sign in with email</Button>
+        </form>
+
         {hasGoogleOAuthCredentials ? (
           <form
             action={async () => {
@@ -56,9 +103,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             </Button>
           </form>
         ) : (
-          <p className="text-xs text-muted-foreground">
-            Google sign-in is not configured on this deployment.
-          </p>
+          <p className="text-xs text-muted-foreground">Google sign-in is not configured on this deployment.</p>
         )}
 
         {hasResendCredentials ? (
@@ -76,9 +121,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             <Button className="w-full">Send magic link</Button>
           </form>
         ) : (
-          <p className="text-xs text-muted-foreground">
-            Magic link sign-in is not configured on this deployment.
-          </p>
+          <p className="text-xs text-muted-foreground">Magic link sign-in is not configured on this deployment.</p>
         )}
       </div>
 
