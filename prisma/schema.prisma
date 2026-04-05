@@ -19,23 +19,37 @@ enum ApprovalStatus {
   REJECTED
 }
 
+enum SecurityType {
+  STOCK
+  INDEX_FUND
+  ETF
+  OTHER
+}
+
+enum TransactionType {
+  BUY
+  SELL
+}
+
 model User {
-  id            String      @id @default(cuid())
-  name          String?
-  email         String?     @unique
-  emailVerified DateTime?
-  image         String?
-  role          Role            @default(USER)
+  id             String         @id @default(cuid())
+  name           String?
+  email          String?        @unique
+  emailVerified  DateTime?
+  image          String?
+  role           Role           @default(USER)
   approvalStatus ApprovalStatus @default(PENDING)
 
-  accounts      Account[]
-  sessions      Session[]
-  votes         Vote[]
-  createdEvents FamilyEvent[]      @relation("EventCreator")
-  investments   InvestmentEntry[]  @relation("InvestmentCreator")
+  accounts               Account[]
+  sessions               Session[]
+  votes                  Vote[]
+  createdEvents          FamilyEvent[]           @relation("EventCreator")
+  investments            InvestmentEntry[]       @relation("InvestmentCreator")
+  securities             Security[]              @relation("SecurityCreator")
+  investmentTransactions InvestmentTransaction[] @relation("InvestmentTransactionCreator")
 
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Account {
@@ -51,8 +65,8 @@ model Account {
   id_token          String?
   session_state     String?
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -80,41 +94,41 @@ model VerificationToken {
 }
 
 model FamilyEvent {
-  id          String            @id @default(cuid())
+  id          String  @id @default(cuid())
   title       String
   description String
   location    String?
 
   createdById String
-  createdBy   User              @relation("EventCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  createdBy   User   @relation("EventCreator", fields: [createdById], references: [id], onDelete: Cascade)
 
   dateOptions EventDateOption[]
 
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model EventDateOption {
   id            String      @id @default(cuid())
-  eventId        String
-  event          FamilyEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  candidateDate  DateTime
+  eventId       String
+  event         FamilyEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  candidateDate DateTime
 
-  votes          Vote[]
+  votes Vote[]
 
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Vote {
-  id           String          @id @default(cuid())
+  id           String @id @default(cuid())
   userId       String
   dateOptionId String
 
-  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  dateOption   EventDateOption @relation(fields: [dateOptionId], references: [id], onDelete: Cascade)
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dateOption EventDateOption @relation(fields: [dateOptionId], references: [id], onDelete: Cascade)
 
-  createdAt    DateTime        @default(now())
+  createdAt DateTime @default(now())
 
   @@unique([userId, dateOptionId])
 }
@@ -128,13 +142,13 @@ model HomePageContent {
 }
 
 model ProfessionalPageContent {
-  singleton           String      @id
-  heroTitle           String
-  heroIntro           String
-  competencies        String[]
+  singleton            String   @id
+  heroTitle            String
+  heroIntro            String
+  competencies         String[]
   experienceHighlights String[]
-  focusAreas          Json
-  updatedAt           DateTime    @updatedAt
+  focusAreas           Json
+  updatedAt            DateTime @updatedAt
 }
 
 model InvestmentEntry {
@@ -147,4 +161,43 @@ model InvestmentEntry {
   createdBy   User     @relation("InvestmentCreator", fields: [createdById], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model Security {
+  id          String       @id @default(cuid())
+  name        String
+  code        String       @unique
+  isin        String?      @unique
+  type        SecurityType
+  currency    String
+  provider    String?
+  source      String?
+  createdById String
+  createdBy   User         @relation("SecurityCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  transactions InvestmentTransaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([type])
+}
+
+model InvestmentTransaction {
+  id           String          @id @default(cuid())
+  securityId   String
+  security     Security        @relation(fields: [securityId], references: [id], onDelete: Cascade)
+  type         TransactionType @default(BUY)
+  transactedOn DateTime
+  quantity     Decimal         @db.Decimal(18, 6)
+  price        Decimal         @db.Decimal(14, 4)
+  fees         Decimal?        @db.Decimal(14, 2)
+  notes        String?
+  createdById  String
+  createdBy    User            @relation("InvestmentTransactionCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@index([securityId])
+  @@index([transactedOn])
 }
