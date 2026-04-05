@@ -19,11 +19,11 @@ type SectionBlockProps = ContainerProps & {
 };
 
 export function PageContainer({ children, className }: ContainerProps) {
-  return <div className={cn("page-content-stack", className)}>{children}</div>;
+  return <div className={cn("page-content-stack w-full", className)}>{children}</div>;
 }
 
 export function SectionContainer({ children, className }: ContainerProps) {
-  return <section className={cn("section-surface", className)}>{children}</section>;
+  return <section className={cn("section-surface w-full", className)}>{children}</section>;
 }
 
 export function PublicPageLayout({ children, className }: ContainerProps) {

@@ -35,6 +35,11 @@ body {
   min-height: 100%;
 }
 
+html {
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+}
+
 body {
   @apply bg-background font-sans text-base font-normal leading-relaxed text-foreground antialiased;
 }
@@ -42,10 +47,6 @@ body {
 @layer components {
   .public-container {
     @apply mx-auto w-full max-w-6xl px-4 sm:px-6;
-  }
-
-  .site-container {
-    @apply public-container;
   }
 
   .public-main-shell {
@@ -99,4 +100,12 @@ body {
   .content-card {
     @apply rounded-2xl border border-border/80 bg-muted/40 px-5 py-4 text-sm leading-relaxed sm:text-base;
   }
+}
+
+body[data-layout-debug="true"] .public-container,
+body[data-layout-debug="true"] .public-main-shell,
+body[data-layout-debug="true"] .page-content-stack,
+body[data-layout-debug="true"] .section-surface {
+  outline: 1px dashed hsl(var(--primary) / 0.55);
+  outline-offset: -1px;
 }
