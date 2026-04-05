@@ -1,6 +1,7 @@
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { canAccessAdminFromSubject, canAccessFamilyFromSubject, canAccessInvestmentsFromSubject } from "@/lib/access-rules";
 import { auth } from "@/lib/auth";
 import {
   EDIT_ACCESS_COOKIE,
@@ -25,6 +26,18 @@ function fromSearchParams(searchParams?: SearchParams) {
   return Array.isArray(value) ? value[0] : value;
 }
 
+export function canAccessFamily(user?: SessionUser | null) {
+  return canAccessFamilyFromSubject(user);
+}
+
+export function canAccessInvestments(user?: SessionUser | null) {
+  return canAccessInvestmentsFromSubject(user);
+}
+
+export function canAccessAdmin(user?: SessionUser | null) {
+  return canAccessAdminFromSubject(user);
+}
+
 export async function requireUser() {
   const session = await auth();
 
@@ -35,15 +48,21 @@ export async function requireUser() {
   return session.user;
 }
 
-export function isApprovedFamilyUser(user?: SessionUser | null) {
-  return Boolean(user?.id && user.role === "FAMILY" && user.approvalStatus === "APPROVED");
-}
-
-export async function requireApprovedFamilyUser() {
+export async function requireFamilyAccessUser() {
   const user = await requireUser();
 
-  if (!isApprovedFamilyUser(user)) {
-    redirect("/login");
+  if (!canAccessFamily(user)) {
+    redirect("/login?state=restricted");
+  }
+
+  return user;
+}
+
+export async function requireInvestmentAccessUser() {
+  const user = await requireUser();
+
+  if (!canAccessInvestments(user)) {
+    redirect("/login?state=restricted");
   }
 
   return user;
@@ -84,7 +103,7 @@ export async function requireAdmin(searchParams?: SearchParams) {
 
   const user = await requireUser();
 
-  if (user.role !== "ADMIN") {
+  if (!canAccessAdmin(user)) {
     redirect("/");
   }
 

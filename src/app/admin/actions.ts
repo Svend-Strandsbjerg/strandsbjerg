@@ -208,7 +208,10 @@ export async function setUserPassword(_: AdminActionState, formData: FormData): 
 
     await prisma.user.update({
       where: { id: userId },
-      data: { passwordHash },
+      data: {
+        passwordHash,
+        passwordChangedAt: new Date(),
+      },
     });
 
     revalidatePath("/admin");

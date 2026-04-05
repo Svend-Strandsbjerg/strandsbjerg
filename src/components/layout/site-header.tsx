@@ -3,10 +3,10 @@ import Link from "next/link";
 import { PublicContainer } from "@/components/layout/public-shell";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { TopNavItemButton, TopNavItemLink } from "@/components/layout/top-nav-item";
-import { isApprovedFamilyUser } from "@/lib/access";
+import { canAccessAdmin, canAccessFamily, canAccessInvestments } from "@/lib/access";
 import { auth, signIn, signOut } from "@/lib/auth";
 import { isEditModeEnabled } from "@/lib/edit-mode";
-import { FAMILY_PRIVATE_BASE_PATH } from "@/lib/private-routes";
+import { FAMILY_PRIVATE_BASE_PATH, INVESTMENTS_PRIVATE_BASE_PATH } from "@/lib/private-routes";
 import { PUBLIC_NAV_ITEMS } from "@/lib/utils";
 
 export async function SiteHeader() {
@@ -26,10 +26,11 @@ export async function SiteHeader() {
               {item.label}
             </TopNavItemLink>
           ))}
-          {isApprovedFamilyUser(session?.user) ? <TopNavItemLink href={FAMILY_PRIVATE_BASE_PATH}>Family</TopNavItemLink> : null}
-          {editModeEnabled ? (
-            <TopNavItemLink href="/admin">Edit</TopNavItemLink>
-          ) : null}
+          {session?.user ? <TopNavItemLink href="/account">My User</TopNavItemLink> : null}
+          {canAccessFamily(session?.user) ? <TopNavItemLink href={FAMILY_PRIVATE_BASE_PATH}>Family</TopNavItemLink> : null}
+          {canAccessInvestments(session?.user) ? <TopNavItemLink href={INVESTMENTS_PRIVATE_BASE_PATH}>Investments</TopNavItemLink> : null}
+          {!editModeEnabled && canAccessAdmin(session?.user) ? <TopNavItemLink href="/admin">Admin</TopNavItemLink> : null}
+          {editModeEnabled ? <TopNavItemLink href="/admin">Edit</TopNavItemLink> : null}
           <ThemeToggle />
           {session?.user ? (
             <form

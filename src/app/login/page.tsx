@@ -2,9 +2,9 @@ import Link from "next/link";
 import { AuthError } from "next-auth";
 import { redirect } from "next/navigation";
 
-import { isApprovedFamilyUser } from "@/lib/access";
+import { canAccessAdmin, canAccessFamily, canAccessInvestments } from "@/lib/access";
 import { auth, signIn } from "@/lib/auth";
-import { FAMILY_PRIVATE_BASE_PATH } from "@/lib/private-routes";
+import { FAMILY_PRIVATE_BASE_PATH, INVESTMENTS_PRIVATE_BASE_PATH } from "@/lib/private-routes";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,19 +23,23 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = searchParams ? await searchParams : undefined;
   const session = await auth();
   const isAuthenticated = Boolean(session?.user?.id);
-  const role = session?.user?.role;
-  const status = session?.user?.approvalStatus;
+  const user = session?.user;
+  const status = user?.approvalStatus;
   const restrictedAccess = params?.state === "restricted";
   const hasGoogleOAuthCredentials = Boolean(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET);
   const hasResendCredentials = Boolean(process.env.AUTH_RESEND_KEY);
   const authErrorKey = !isAuthenticated ? (Array.isArray(params?.error) ? params?.error[0] : params?.error) : undefined;
 
   if (isAuthenticated && status === "APPROVED") {
-    if (role === "FAMILY") {
+    if (canAccessAdmin(user)) {
+      redirect("/admin");
+    }
+
+    if (canAccessFamily(user)) {
       redirect(FAMILY_PRIVATE_BASE_PATH);
     }
 
-    redirect("/");
+    redirect("/account");
   }
 
   const credentialsSignIn = async (formData: FormData) => {
@@ -81,16 +85,31 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           {status === "REJECTED" ? (
             <p className="text-destructive">Your account request was rejected. You do not have access to family features.</p>
           ) : status === "PENDING" ? (
-            <p className="text-amber-700">Your account is awaiting approval. Family features are restricted until approved.</p>
+            <p className="text-amber-700">Your account is awaiting approval. Family and investment features are restricted until approved.</p>
           ) : (
             <p className="text-foreground">You are signed in.</p>
           )}
           {restrictedAccess ? <p className="mt-2 text-muted-foreground">You tried to open a restricted route.</p> : null}
-          {isApprovedFamilyUser(session.user) ? (
-            <Link href={FAMILY_PRIVATE_BASE_PATH} className="mt-3 inline-block underline-offset-4 hover:underline">
-              Open family area
+          <div className="mt-3 flex flex-wrap gap-3">
+            <Link href="/account" className="inline-block underline-offset-4 hover:underline">
+              Open account
             </Link>
-          ) : null}
+            {canAccessFamily(user) ? (
+              <Link href={FAMILY_PRIVATE_BASE_PATH} className="inline-block underline-offset-4 hover:underline">
+                Open family area
+              </Link>
+            ) : null}
+            {canAccessInvestments(user) ? (
+              <Link href={INVESTMENTS_PRIVATE_BASE_PATH} className="inline-block underline-offset-4 hover:underline">
+                Open investments
+              </Link>
+            ) : null}
+            {canAccessAdmin(user) ? (
+              <Link href="/admin" className="inline-block underline-offset-4 hover:underline">
+                Open admin
+              </Link>
+            ) : null}
+          </div>
         </div>
       ) : null}
 

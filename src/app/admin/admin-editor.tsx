@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { HomePageContent, ProfessionalPageContent } from "@/lib/content";
+import { formatAuthMethodLabel } from "@/lib/login-activity";
 
 type AdminEditorProps = {
   homeContent: HomePageContent;
@@ -27,6 +28,14 @@ type AdminEditorProps = {
     role: "ADMIN" | "FAMILY" | "USER";
     approvalStatus: "PENDING" | "APPROVED" | "REJECTED";
     createdAt: Date;
+    loginActivities: Array<{
+      id: string;
+      timestamp: Date;
+      authMethod: "CREDENTIALS" | "GOOGLE" | "MAGIC_LINK" | "OAUTH";
+    }>;
+    _count: {
+      loginActivities: number;
+    };
   }>;
   currentAdminUserId?: string | null;
 };
@@ -237,6 +246,8 @@ export function AdminEditor({ homeContent, professionalContent, users, currentAd
                 <th className="py-2 pr-3 font-medium">Role</th>
                 <th className="py-2 pr-3 font-medium">Approval status</th>
                 <th className="py-2 pr-3 font-medium">Created at</th>
+                <th className="py-2 pr-3 font-medium">Login activity</th>
+                <th className="py-2 pr-3 font-medium">Access check</th>
                 <th className="py-2 font-medium">Admin actions</th>
               </tr>
             </thead>
@@ -247,6 +258,28 @@ export function AdminEditor({ homeContent, professionalContent, users, currentAd
                   <td className="py-3 pr-3">{user.role.toLowerCase()}</td>
                   <td className="py-3 pr-3">{user.approvalStatus.toLowerCase()}</td>
                   <td className="py-3 pr-3">{user.createdAt.toISOString().slice(0, 10)}</td>
+                  <td className="py-3 pr-3 text-xs text-muted-foreground">
+                    <p>{user._count.loginActivities} total logins</p>
+                    <p className="mt-1">
+                      Latest: {user.loginActivities[0] ? user.loginActivities[0].timestamp.toLocaleString() : "Never"}
+                    </p>
+                    {user.loginActivities.length > 0 ? (
+                      <details className="mt-2">
+                        <summary className="cursor-pointer">Recent events</summary>
+                        <ul className="mt-1 space-y-1">
+                          {user.loginActivities.map((entry) => (
+                            <li key={entry.id}>
+                              {formatAuthMethodLabel(entry.authMethod)} · {entry.timestamp.toLocaleString()}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    ) : null}
+                  </td>
+                  <td className="py-3 pr-3 text-xs text-muted-foreground">
+                    <p>Family: {user.approvalStatus === "APPROVED" && ["FAMILY", "ADMIN"].includes(user.role) ? "yes" : "no"}</p>
+                    <p className="mt-1">Investments: {user.approvalStatus === "APPROVED" && user.role === "ADMIN" ? "yes" : "no"}</p>
+                  </td>
                   <td className="py-3">
                     <div className="flex flex-wrap items-center gap-2">
                       <form action={approvalAction}>

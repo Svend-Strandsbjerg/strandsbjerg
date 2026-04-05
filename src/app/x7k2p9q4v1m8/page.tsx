@@ -1,13 +1,13 @@
 import Link from "next/link";
 
 import { CreateEventForm } from "@/components/familie/create-event-form";
-import { requireApprovedFamilyUser } from "@/lib/access";
+import { requireFamilyAccessUser } from "@/lib/access";
 import { FAMILY_PRIVATE_BASE_PATH } from "@/lib/private-routes";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 export default async function PrivatePlanningPage() {
-  const user = await requireApprovedFamilyUser();
+  const user = await requireFamilyAccessUser();
 
   const events = await prisma.familyEvent.findMany({
     orderBy: { createdAt: "desc" },

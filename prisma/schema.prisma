@@ -31,6 +31,13 @@ enum TransactionType {
   SELL
 }
 
+enum AuthMethod {
+  CREDENTIALS
+  GOOGLE
+  MAGIC_LINK
+  OAUTH
+}
+
 model User {
   id             String         @id @default(cuid())
   name           String?
@@ -48,9 +55,11 @@ model User {
   investments            InvestmentEntry[]       @relation("InvestmentCreator")
   securities             Security[]              @relation("SecurityCreator")
   investmentTransactions InvestmentTransaction[] @relation("InvestmentTransactionCreator")
+  loginActivities         LoginActivity[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  passwordChangedAt DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 model Account {
@@ -201,4 +210,17 @@ model InvestmentTransaction {
 
   @@index([securityId])
   @@index([transactedOn])
+}
+
+model LoginActivity {
+  id         String     @id @default(cuid())
+  userId     String
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  timestamp  DateTime   @default(now())
+  authMethod AuthMethod
+  ipAddress  String?
+  userAgent  String?
+
+  @@index([userId, timestamp])
+  @@index([timestamp])
 }

@@ -3,7 +3,7 @@
 import { Prisma, SecurityType, TransactionType } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
-import { requireUser } from "@/lib/access";
+import { requireInvestmentAccessUser } from "@/lib/access";
 import { INVESTMENTS_PRIVATE_BASE_PATH } from "@/lib/private-routes";
 import { prisma } from "@/lib/prisma";
 
@@ -22,7 +22,7 @@ function normalizeInputValue(formData: FormData, fieldName: string) {
 }
 
 export async function createSecurity(formData: FormData) {
-  const user = await requireUser();
+  const user = await requireInvestmentAccessUser();
 
   const name = normalizeInputValue(formData, "name");
   const code = normalizeInputValue(formData, "code").toUpperCase();
@@ -94,7 +94,7 @@ export async function createSecurity(formData: FormData) {
 }
 
 export async function createTransaction(formData: FormData) {
-  const user = await requireUser();
+  const user = await requireInvestmentAccessUser();
 
   const securityId = normalizeInputValue(formData, "securityId");
   const transactionTypeRaw = normalizeInputValue(formData, "type") || "BUY";

@@ -1,8 +1,8 @@
 import { InvestmentsSubnav } from "@/app/m4z8r2q9t7y1/investments-subnav";
-import { requireUser } from "@/lib/access";
+import { requireInvestmentAccessUser } from "@/lib/access";
 
 export default async function InvestmentsLayout({ children }: { children: React.ReactNode }) {
-  await requireUser();
+  await requireInvestmentAccessUser();
 
 
   return (

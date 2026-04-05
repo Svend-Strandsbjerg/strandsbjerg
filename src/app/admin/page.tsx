@@ -20,6 +20,20 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       role: true,
       approvalStatus: true,
       createdAt: true,
+      loginActivities: {
+        orderBy: { timestamp: "desc" },
+        take: 5,
+        select: {
+          id: true,
+          timestamp: true,
+          authMethod: true,
+        },
+      },
+      _count: {
+        select: {
+          loginActivities: true,
+        },
+      },
     },
   });
 
