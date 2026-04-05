@@ -8,15 +8,7 @@ import { defaultHomeContent, defaultProfessionalContent, type ProfessionalPageCo
 import { hashPassword } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
 
-export type AdminActionState = {
-  status: "idle" | "success" | "error";
-  message: string;
-};
-
-export const initialAdminActionState: AdminActionState = {
-  status: "idle",
-  message: "",
-};
+import type { AdminActionState } from "@/app/admin/action-state";
 
 function linesToList(raw: FormDataEntryValue | null, fallback: string[]) {
   const lines = String(raw ?? "")

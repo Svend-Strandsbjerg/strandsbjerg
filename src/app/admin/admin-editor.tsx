@@ -4,15 +4,8 @@ import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 
-import {
-  initialAdminActionState,
-  saveHomeContent,
-  saveProfessionalContent,
-  setUserApprovalStatus,
-  setUserPassword,
-  setUserRole,
-  type AdminActionState,
-} from "@/app/admin/actions";
+import { saveHomeContent, saveProfessionalContent, setUserApprovalStatus, setUserPassword, setUserRole } from "@/app/admin/actions";
+import { initialAdminActionState, type AdminActionState } from "@/app/admin/action-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
