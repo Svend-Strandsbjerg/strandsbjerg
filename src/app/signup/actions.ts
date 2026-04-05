@@ -1,18 +1,10 @@
 "use server";
 
 import { ApprovalStatus, Role } from "@prisma/client";
+
+import type { SignupActionState } from "@/app/signup/state";
 import { hashPassword } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
-
-export type SignupActionState = {
-  status: "idle" | "success" | "error";
-  message: string;
-};
-
-export const initialSignupActionState: SignupActionState = {
-  status: "idle",
-  message: "",
-};
 
 export async function registerUser(_: SignupActionState, formData: FormData): Promise<SignupActionState> {
   const email = String(formData.get("email") ?? "")
