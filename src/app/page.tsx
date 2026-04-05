@@ -27,7 +27,7 @@ export default async function HomePage() {
         title="Core strengths"
         subtitle="Technical capabilities I prioritize to deliver robust software solutions and sustainable engineering outcomes."
       >
-        <ContentContainer className="space-y-0">
+        <ContentContainer>
           <ul className="grid gap-3 sm:gap-4 md:grid-cols-2">
             {content.sections.map((item) => (
               <li key={item} className="content-card">

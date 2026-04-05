@@ -35,13 +35,22 @@ body {
   min-height: 100%;
 }
 
+html {
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+}
+
 body {
   @apply bg-background font-sans text-base font-normal leading-relaxed text-foreground antialiased;
 }
 
 @layer components {
-  .site-container {
+  .public-container {
     @apply mx-auto w-full max-w-6xl px-4 sm:px-6;
+  }
+
+  .public-main-shell {
+    @apply public-container flex-1 py-8 sm:py-12;
   }
 
   .page-content-stack {
@@ -64,7 +73,39 @@ body {
     @apply max-w-3xl text-base font-normal leading-relaxed text-muted-foreground sm:text-lg;
   }
 
+  .public-intro-block {
+    @apply space-y-5 text-left;
+  }
+
+  .public-section-block {
+    @apply space-y-6 text-left;
+  }
+
+  .public-section-header {
+    @apply space-y-2;
+  }
+
+  .section-title {
+    @apply text-2xl font-semibold leading-tight tracking-tight sm:text-3xl;
+  }
+
+  .section-subtitle {
+    @apply max-w-3xl text-sm leading-relaxed text-muted-foreground sm:text-base;
+  }
+
+  .public-content-stack {
+    @apply space-y-4 sm:space-y-5;
+  }
+
   .content-card {
     @apply rounded-2xl border border-border/80 bg-muted/40 px-5 py-4 text-sm leading-relaxed sm:text-base;
   }
+}
+
+body[data-layout-debug="true"] .public-container,
+body[data-layout-debug="true"] .public-main-shell,
+body[data-layout-debug="true"] .page-content-stack,
+body[data-layout-debug="true"] .section-surface {
+  outline: 1px dashed hsl(var(--primary) / 0.55);
+  outline-offset: -1px;
 }
