@@ -127,51 +127,31 @@ export async function saveProfessionalContent(_: AdminActionState, formData: For
   }
 }
 
-export async function setUserApprovalStatus(_: AdminActionState, formData: FormData): Promise<AdminActionState> {
-  try {
-    await requireAdmin();
-
-    const userId = String(formData.get("userId") ?? "");
-    const status = String(formData.get("approvalStatus") ?? "");
-
-    if (!userId || !["PENDING", "APPROVED", "REJECTED"].includes(status)) {
-      return { status: "error", message: "Invalid approval update request." };
-    }
-
-    await prisma.user.update({
-      where: { id: userId },
-      data: { approvalStatus: status as ApprovalStatus },
-    });
-
-    revalidatePath("/admin");
-
-    return { status: "success", message: "User approval status updated." };
-  } catch {
-    return { status: "error", message: "Could not update user approval status." };
-  }
-}
-
-export async function setUserRole(_: AdminActionState, formData: FormData): Promise<AdminActionState> {
+export async function updateUserAccess(_: AdminActionState, formData: FormData): Promise<AdminActionState> {
   try {
     await requireAdmin();
 
     const userId = String(formData.get("userId") ?? "");
     const role = String(formData.get("role") ?? "");
+    const approvalStatus = String(formData.get("approvalStatus") ?? "");
 
-    if (!userId || !["ADMIN", "FAMILY", "USER"].includes(role)) {
-      return { status: "error", message: "Invalid role assignment request." };
+    if (!userId || !["ADMIN", "FAMILY", "USER"].includes(role) || !["PENDING", "APPROVED", "REJECTED"].includes(approvalStatus)) {
+      return { status: "error", message: "Invalid user update request." };
     }
 
     await prisma.user.update({
       where: { id: userId },
-      data: { role: role as Role },
+      data: {
+        role: role as Role,
+        approvalStatus: approvalStatus as ApprovalStatus,
+      },
     });
 
     revalidatePath("/admin");
 
-    return { status: "success", message: "User role updated." };
+    return { status: "success", message: "User updated." };
   } catch {
-    return { status: "error", message: "Could not update user role." };
+    return { status: "error", message: "Could not update user." };
   }
 }
 

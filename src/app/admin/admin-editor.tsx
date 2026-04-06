@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 
-import { saveHomeContent, saveProfessionalContent, setUserApprovalStatus, setUserPassword, setUserRole } from "@/app/admin/actions";
+import { saveHomeContent, saveProfessionalContent, setUserPassword, updateUserAccess } from "@/app/admin/actions";
 import { initialAdminActionState, type AdminActionState } from "@/app/admin/action-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,8 +56,7 @@ function StatusMessage({ state }: { state: AdminActionState }) {
 export function AdminEditor({ homeContent, professionalContent, users, currentAdminUserId }: AdminEditorProps) {
   const [homeState, homeAction] = useActionState(saveHomeContent, initialAdminActionState);
   const [professionalState, professionalAction] = useActionState(saveProfessionalContent, initialAdminActionState);
-  const [approvalState, approvalAction] = useActionState(setUserApprovalStatus, initialAdminActionState);
-  const [roleState, roleAction] = useActionState(setUserRole, initialAdminActionState);
+  const [userUpdateState, userUpdateAction] = useActionState(updateUserAccess, initialAdminActionState);
   const [passwordState, passwordAction] = useActionState(setUserPassword, initialAdminActionState);
 
   const [isDirty, setIsDirty] = useState(false);
@@ -81,20 +80,18 @@ export function AdminEditor({ homeContent, professionalContent, users, currentAd
     if (
       homeState.status === "success" ||
       professionalState.status === "success" ||
-      approvalState.status === "success" ||
-      roleState.status === "success" ||
+      userUpdateState.status === "success" ||
       passwordState.status === "success"
     ) {
       setIsDirty(false);
     }
-  }, [homeState.status, professionalState.status, approvalState.status, roleState.status, passwordState.status]);
+  }, [homeState.status, professionalState.status, userUpdateState.status, passwordState.status]);
 
   const onInput = () => {
     setIsDirty(true);
   };
 
-  const userManagementState =
-    passwordState.status !== "idle" ? passwordState : approvalState.status !== "idle" ? approvalState : roleState;
+  const userManagementState = passwordState.status !== "idle" ? passwordState : userUpdateState;
 
   return (
     <div ref={formRef} onInput={onInput} className="space-y-8 sm:space-y-10">
@@ -275,29 +272,24 @@ export function AdminEditor({ homeContent, professionalContent, users, currentAd
                   </td>
                   <td className="py-3">
                     <div className="flex flex-wrap items-center gap-2">
-                      <form action={approvalAction}>
-                        <input type="hidden" name="userId" value={user.id} />
-                        <input type="hidden" name="approvalStatus" value="APPROVED" />
-                        <Button type="submit" variant="outline">
-                          Approve
-                        </Button>
-                      </form>
-                      <form action={approvalAction}>
-                        <input type="hidden" name="userId" value={user.id} />
-                        <input type="hidden" name="approvalStatus" value="REJECTED" />
-                        <Button type="submit" variant="outline">
-                          Reject
-                        </Button>
-                      </form>
-                      <form action={roleAction} className="flex items-center gap-2">
+                      <form action={userUpdateAction} className="flex flex-wrap items-center gap-2">
                         <input type="hidden" name="userId" value={user.id} />
                         <select name="role" defaultValue={user.role} className="h-9 rounded-md border border-input bg-background px-3 text-sm">
                           <option value="USER">user</option>
                           <option value="FAMILY">family</option>
                           <option value="ADMIN">admin</option>
                         </select>
+                        <select
+                          name="approvalStatus"
+                          defaultValue={user.approvalStatus}
+                          className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                        >
+                          <option value="PENDING">pending</option>
+                          <option value="APPROVED">approved</option>
+                          <option value="REJECTED">rejected</option>
+                        </select>
                         <Button type="submit" disabled={user.id === currentAdminUserId}>
-                          Set role
+                          Update
                         </Button>
                       </form>
                       <details className="rounded-md border border-border/70 bg-muted/10 px-3 py-2">
