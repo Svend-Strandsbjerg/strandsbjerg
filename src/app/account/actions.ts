@@ -6,15 +6,7 @@ import { requireUser } from "@/lib/access";
 import { verifyPassword, hashPassword } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
 
-export type AccountActionState = {
-  status: "idle" | "success" | "error";
-  message: string;
-};
-
-export const initialAccountActionState: AccountActionState = {
-  status: "idle",
-  message: "",
-};
+import type { AccountActionState } from "@/app/account/action-state";
 
 export async function updateMyProfile(_: AccountActionState, formData: FormData): Promise<AccountActionState> {
   try {

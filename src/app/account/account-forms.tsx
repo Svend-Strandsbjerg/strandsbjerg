@@ -2,7 +2,8 @@
 
 import { useActionState } from "react";
 
-import { changeMyPassword, initialAccountActionState, updateMyProfile } from "@/app/account/actions";
+import { changeMyPassword, updateMyProfile } from "@/app/account/actions";
+import { initialAccountActionState } from "@/app/account/action-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
