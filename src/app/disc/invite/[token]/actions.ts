@@ -182,6 +182,23 @@ export async function submitInviteDiscAssessment(_: InviteDiscState, formData: F
       data: { status: AssessmentInviteStatus.COMPLETED },
     });
 
+    const submittedCountForCompany = invite.companyId
+      ? await prisma.discAssessment.count({
+          where: {
+            companyId: invite.companyId,
+            status: "SUBMITTED",
+          },
+        })
+      : 0;
+
+    if (invite.companyId && submittedCountForCompany === 1) {
+      logServerEvent("info", "disc_beta_first_completion", {
+        companyId: invite.companyId,
+        inviteId: invite.id,
+        sessionId,
+      });
+    }
+
     revalidatePath(`/disc/invite/${token}`);
 
     return { status: "success", message: "Responses submitted successfully.", sessionId };
