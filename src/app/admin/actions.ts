@@ -135,7 +135,7 @@ export async function updateUserAccess(_: AdminActionState, formData: FormData):
     const role = String(formData.get("role") ?? "");
     const approvalStatus = String(formData.get("approvalStatus") ?? "");
 
-    if (!userId || !["ADMIN", "FAMILY", "USER"].includes(role) || !["PENDING", "APPROVED", "REJECTED"].includes(approvalStatus)) {
+    if (!userId || !["ADMIN", "USER"].includes(role) || !["PENDING", "APPROVED", "REJECTED"].includes(approvalStatus)) {
       return { status: "error", message: "Invalid user update request." };
     }
 

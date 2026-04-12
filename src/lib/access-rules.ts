@@ -1,4 +1,4 @@
-export type AccessRole = "ADMIN" | "FAMILY" | "USER";
+export type AccessRole = "ADMIN" | "USER";
 export type AccessApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 export type AccessSubject = {
@@ -12,7 +12,7 @@ export function isApproved(subject?: AccessSubject | null) {
 }
 
 export function canAccessFamilyFromSubject(subject?: AccessSubject | null) {
-  return Boolean(isApproved(subject) && (subject?.role === "FAMILY" || subject?.role === "ADMIN"));
+  return Boolean(isApproved(subject));
 }
 
 export function canAccessInvestmentsFromSubject(subject?: AccessSubject | null) {
