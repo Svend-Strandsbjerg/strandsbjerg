@@ -56,21 +56,30 @@ type CompanyDiscAdminProps = {
 type CompanyFilterStatus = "all" | "pending" | "completed";
 
 function CopyLinkButton({ link }: { link: string }) {
-  const [copied, setCopied] = useState(false);
+  const [copyState, setCopyState] = useState<"idle" | "success" | "error">("idle");
 
   return (
-    <Button
-      type="button"
-      variant="outline"
-      className="h-8 text-xs"
-      onClick={async () => {
-        await navigator.clipboard.writeText(link);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
-      }}
-    >
-      {copied ? "Copied" : "Copy link"}
-    </Button>
+    <div className="space-y-1">
+      <Button
+        type="button"
+        variant="outline"
+        className="h-8 text-xs"
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(link);
+            setCopyState("success");
+          } catch {
+            setCopyState("error");
+          }
+
+          setTimeout(() => setCopyState("idle"), 2200);
+        }}
+      >
+        {copyState === "success" ? "Copied ✓" : copyState === "error" ? "Copy failed" : "Copy link"}
+      </Button>
+      {copyState === "success" ? <p className="text-[11px] text-emerald-700">Next: paste it in your message to the candidate.</p> : null}
+      {copyState === "error" ? <p className="text-[11px] text-destructive">Could not access your clipboard. Copy manually from the invite URL.</p> : null}
+    </div>
   );
 }
 
@@ -80,6 +89,7 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
   const [resendInviteState, resendInviteAction] = useActionState(resendAssessmentInviteEmail, initialCompanyInviteActionState);
   const [resendState, resendAction] = useActionState(resendAssessmentResultEmail, initialCompanyInviteActionState);
   const [statusFilter, setStatusFilter] = useState<CompanyFilterStatus>("all");
+  const [lastCreatedCompanyId, setLastCreatedCompanyId] = useState<string | null>(null);
   const infoState = useMemo(() => {
     if (resendState.status !== "idle") {
       return resendState;
@@ -110,7 +120,19 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
           </ol>
         </div>
         {infoState.status !== "idle" ? (
-          <p className={infoState.status === "success" ? "mt-2 text-sm text-emerald-700" : "mt-2 text-sm text-destructive"}>{infoState.message}</p>
+          <div
+            className={cn(
+              "mt-3 rounded-xl border p-3 text-sm",
+              infoState.status === "success" ? "border-emerald-200 bg-emerald-50/70 text-emerald-900" : "border-destructive/30 bg-destructive/10 text-destructive",
+            )}
+          >
+            <p className="font-medium">{infoState.message}</p>
+            {infoState.status === "success" ? (
+              <p className="mt-1 text-xs text-emerald-800/90">
+                Next step: share the invite link with your candidate. You&apos;ll see the status change to completed as soon as they submit.
+              </p>
+            ) : null}
+          </div>
         ) : null}
       </div>
 
@@ -134,7 +156,9 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
                 <input type="checkbox" name="sendInviteEmail" className="h-4 w-4" />
                 Send invite email to candidate
               </label>
-              <Button type="submit">Create invite</Button>
+              <Button type="submit" onClick={() => setLastCreatedCompanyId(company.id)}>
+                Create invite
+              </Button>
             </div>
           </form>
 
@@ -156,9 +180,23 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
             const totalInvites = rows.length;
             const pendingInvites = rows.filter((row) => row.mappedStatus === "pending").length;
             const completedAssessments = rows.filter((row) => row.mappedStatus === "completed").length;
+            const latestInvite = [...rows].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] ?? null;
+            const showFirstInviteSuccess = createState.status === "success" && lastCreatedCompanyId === company.id && totalInvites === 1 && latestInvite;
+            const firstInviteLink = latestInvite ? `${origin}/disc/invite/${latestInvite.token}` : null;
 
             return (
               <>
+                {showFirstInviteSuccess && firstInviteLink ? (
+                  <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
+                    <p className="text-sm font-semibold text-emerald-900">Your first invite is ready.</p>
+                    <p className="mt-1 text-sm text-emerald-900/90">Send this link to your candidate to start the DISC assessment:</p>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <code className="max-w-full overflow-x-auto rounded-md bg-background px-2 py-1 text-xs text-foreground">{firstInviteLink}</code>
+                      <CopyLinkButton link={firstInviteLink} />
+                    </div>
+                  </div>
+                ) : null}
+
                 <div className="mt-6 grid gap-3 md:grid-cols-3">
                   <div className="rounded-xl border border-border/80 bg-background/50 p-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Total invites</p>
@@ -227,12 +265,32 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
                             const resultLink = row.latestAssessment?.resultShare?.token
                               ? `${origin}/disc/result/${row.latestAssessment.resultShare.token}`
                               : null;
+                            const isFreshCompletion = Boolean(completionDate && now - completionDate.getTime() <= 1000 * 60 * 60 * 24 * 3);
 
                             return (
-                              <tr key={row.id}>
+                              <tr key={row.id} className={cn(row.mappedStatus === "completed" ? "bg-emerald-50/40" : undefined)}>
                                 <td className="px-3 py-3">{row.candidateName ?? "Unnamed candidate"}</td>
                                 <td className="px-3 py-3 text-muted-foreground">{row.candidateEmail ?? "No email"}</td>
-                                <td className="px-3 py-3 capitalize">{row.mappedStatus}</td>
+                                <td className="px-3 py-3 capitalize">
+                                  <span
+                                    className={cn(
+                                      "inline-flex rounded-full border px-2 py-0.5 text-xs font-medium",
+                                      row.mappedStatus === "completed"
+                                        ? "border-emerald-300 bg-emerald-100 text-emerald-900"
+                                        : row.mappedStatus === "pending"
+                                          ? "border-amber-300 bg-amber-100 text-amber-900"
+                                          : "border-border bg-muted text-muted-foreground",
+                                    )}
+                                  >
+                                    {row.mappedStatus}
+                                  </span>
+                                  {row.mappedStatus === "pending" ? (
+                                    <p className="mt-1 text-[11px] normal-case text-muted-foreground">Waiting for candidate submission.</p>
+                                  ) : null}
+                                  {isFreshCompletion ? (
+                                    <p className="mt-1 text-[11px] normal-case font-medium text-emerald-700">New result ready for review.</p>
+                                  ) : null}
+                                </td>
                                 <td className="px-3 py-3 text-muted-foreground">{row.createdAt.toISOString().slice(0, 10)}</td>
                                 <td className="px-3 py-3 text-muted-foreground">{completionDate ? completionDate.toISOString().slice(0, 10) : "—"}</td>
                                 <td className="px-3 py-3">
@@ -301,9 +359,21 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
               <div className="space-y-3">
                 {company.assessments.map((assessment, index) => {
                   const resultLink = assessment.resultShare ? `${origin}/disc/result/${assessment.resultShare.token}` : null;
+                  const isFreshCompletion = Boolean(
+                    assessment.submittedAt && Date.now() - assessment.submittedAt.getTime() <= 1000 * 60 * 60 * 24 * 3,
+                  );
 
                   return (
-                    <div key={assessment.id} className="space-y-2 rounded-2xl border border-border/70 p-3">
+                    <div
+                      key={assessment.id}
+                      className={cn(
+                        "space-y-2 rounded-2xl border p-3",
+                        isFreshCompletion ? "border-emerald-300 bg-emerald-50/40" : "border-border/70",
+                      )}
+                    >
+                      {isFreshCompletion ? (
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">New completion</p>
+                      ) : null}
                       <DiscResultPresentation
                         title={`Company result #${company.assessments.length - index}`}
                         status={assessment.status}

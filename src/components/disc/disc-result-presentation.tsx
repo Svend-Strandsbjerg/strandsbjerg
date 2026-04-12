@@ -10,7 +10,9 @@ type DiscResultPresentationProps = {
   rawResponses: unknown;
   externalSessionId?: string;
   identityLabel?: string;
+  companyLabel?: string;
   emptyMessage?: string;
+  footerNote?: string;
 };
 
 function formatDate(value: Date | null) {
@@ -59,7 +61,9 @@ export function DiscResultPresentation({
   rawResponses,
   externalSessionId,
   identityLabel,
+  companyLabel,
   emptyMessage,
+  footerNote,
 }: DiscResultPresentationProps) {
   const { records, interpretationText, dominantInsight, secondaryInsight, dimensionCounts } = buildDiscInsights(rawResponses);
   const dimensionSamples = getDimensionSamples(records);
@@ -90,24 +94,25 @@ export function DiscResultPresentation({
         <p className="mt-1 text-sm text-muted-foreground">
           {identityLabel ? `${identityLabel} · ` : ""}Completed on {formatDate(completionDate)} · Status: {status.toLowerCase()}
         </p>
+        {companyLabel ? <p className="mt-1 text-xs text-muted-foreground/90">Shared by {companyLabel}</p> : null}
       </div>
 
       <section className="rounded-xl border border-border/70 p-4">
         <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Your profile summary</h4>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">
           {dominantInsight
             ? `${dominantInsight.label} appears most prominent in this result${secondaryInsight ? `, with support from ${secondaryInsight.label}` : ""}.`
             : "A completed response set is available, but a dominant DISC dimension could not be inferred from the current payload."}
         </p>
-        {dominantInsight ? <p className="mt-2 text-sm text-muted-foreground">{dominantInsight.summary}</p> : null}
-        {interpretationText ? <p className="mt-2 text-sm text-muted-foreground">{interpretationText}</p> : null}
+        {dominantInsight ? <p className="mt-3 text-sm leading-6 text-muted-foreground">{dominantInsight.summary}</p> : null}
+        {interpretationText ? <p className="mt-3 text-sm leading-6 text-muted-foreground">{interpretationText}</p> : null}
       </section>
 
       {dominantInsight ? (
         <>
           <section className="rounded-xl border border-border/70 p-4">
             <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Strengths</h4>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+            <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-muted-foreground">
               {dominantInsight.strengths.map((item) => (
                 <li key={item}>{item}</li>
               ))}
@@ -116,7 +121,7 @@ export function DiscResultPresentation({
 
           <section className="rounded-xl border border-border/70 p-4">
             <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Potential challenges</h4>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+            <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-muted-foreground">
               {dominantInsight.challenges.map((item) => (
                 <li key={item}>{item}</li>
               ))}
@@ -126,11 +131,11 @@ export function DiscResultPresentation({
           <section className="grid gap-3 md:grid-cols-2">
             <div className="rounded-xl border border-border/70 p-4">
               <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">How you communicate</h4>
-              <p className="mt-2 text-sm text-muted-foreground">{dominantInsight.communication}</p>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">{dominantInsight.communication}</p>
             </div>
             <div className="rounded-xl border border-border/70 p-4">
               <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">How you work best</h4>
-              <p className="mt-2 text-sm text-muted-foreground">{dominantInsight.workStyle}</p>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">{dominantInsight.workStyle}</p>
             </div>
           </section>
         </>
@@ -166,6 +171,8 @@ export function DiscResultPresentation({
           </ul>
         </section>
       ) : null}
+
+      {footerNote ? <p className="px-1 text-xs text-muted-foreground">{footerNote}</p> : null}
     </div>
   );
 }

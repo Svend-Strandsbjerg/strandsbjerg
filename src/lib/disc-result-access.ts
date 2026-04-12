@@ -4,7 +4,11 @@ import { prisma } from "@/lib/prisma";
 
 export type SharedDiscResultRecord = Prisma.AssessmentResultShareGetPayload<{
   include: {
-    assessment: true;
+    assessment: {
+      include: {
+        company: true;
+      };
+    };
   };
 }>;
 
@@ -20,7 +24,11 @@ export async function getSharedDiscResultAccess(token: string): Promise<SharedRe
   const sharedResult = await prisma.assessmentResultShare.findUnique({
     where: { token },
     include: {
-      assessment: true,
+      assessment: {
+        include: {
+          company: true,
+        },
+      },
     },
   });
 
