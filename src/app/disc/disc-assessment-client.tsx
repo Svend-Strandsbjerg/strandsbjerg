@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 type DiscAssessmentClientProps = {
   userId: string | null;
+  hasCompanyDiscAccess: boolean;
   assessments: Array<{
     id: string;
     status: "STARTED" | "SUBMITTED" | "FAILED";
@@ -22,7 +23,7 @@ type DiscAssessmentClientProps = {
   }>;
 };
 
-export function DiscAssessmentClient({ userId, assessments }: DiscAssessmentClientProps) {
+export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments }: DiscAssessmentClientProps) {
   const [startState, startAction, starting] = useActionState(startDiscAssessment, initialDiscFlowState);
   const [submitState, submitAction, submitting] = useActionState(submitDiscAssessmentResponses, initialDiscFlowState);
 
@@ -37,7 +38,7 @@ export function DiscAssessmentClient({ userId, assessments }: DiscAssessmentClie
         <p className="text-sm text-muted-foreground">
           Starts a DISC session on the server and submits responses via the server-side integration layer.
         </p>
-        {userId ? (
+        {userId && hasCompanyDiscAccess ? (
           <p className="text-xs text-muted-foreground">
             Need to invite a candidate? <Link className="underline" href="/disc/company">Open company DISC admin</Link>
           </p>
