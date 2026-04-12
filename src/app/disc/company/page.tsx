@@ -56,6 +56,14 @@ export default async function CompanyDiscPage() {
               userId: true,
               submittedAt: true,
               createdAt: true,
+              status: true,
+              rawResponses: true,
+              resultShare: {
+                select: {
+                  token: true,
+                  expiresAt: true,
+                },
+              },
             },
           },
         },

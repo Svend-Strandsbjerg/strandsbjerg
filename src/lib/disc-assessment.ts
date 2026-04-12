@@ -2,6 +2,7 @@ import "server-only";
 
 import { DiscAssessmentStatus, type Prisma } from "@prisma/client";
 
+import { ensureAssessmentResultShare } from "@/lib/disc-result-share";
 import { prisma } from "@/lib/prisma";
 
 export function getConfiguredDiscAssessmentVersionId() {
@@ -51,7 +52,7 @@ export async function markDiscAssessmentSubmitted(params: {
   externalSessionId: string;
   rawResponses: Prisma.InputJsonValue;
 }) {
-  return prisma.discAssessment.upsert({
+  const assessment = await prisma.discAssessment.upsert({
     where: { externalSessionId: params.externalSessionId },
     update: {
       rawResponses: params.rawResponses,
@@ -66,4 +67,8 @@ export async function markDiscAssessmentSubmitted(params: {
       rawResponses: params.rawResponses,
     },
   });
+
+  await ensureAssessmentResultShare(assessment.id);
+
+  return assessment;
 }

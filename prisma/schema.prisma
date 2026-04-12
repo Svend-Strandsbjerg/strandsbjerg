@@ -139,13 +139,29 @@ model DiscAssessment {
   status              DiscAssessmentStatus @default(STARTED)
   rawResponses        Json?
 
-  user    User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user        User?                  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  resultShare AssessmentResultShare?
   invite  AssessmentInvite? @relation(fields: [inviteId], references: [id], onDelete: SetNull)
   company Company?          @relation(fields: [companyId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt])
   @@index([companyId, createdAt])
   @@index([inviteId])
+}
+
+
+model AssessmentResultShare {
+  id           String   @id @default(cuid())
+  assessmentId String   @unique
+  token        String   @unique
+  expiresAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  assessment DiscAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([expiresAt])
 }
 
 model Account {
