@@ -7,7 +7,7 @@ import { AssessmentInviteStatus } from "@prisma/client";
 import { requireUser } from "@/lib/access";
 import { isCompanyRecruiter } from "@/lib/company-access";
 import { sendDiscEmail } from "@/lib/disc-email";
-import { createUniqueAssessmentInviteToken, getInviteAccessState } from "@/lib/disc-invites";
+import { createUniqueAssessmentInviteToken, getInviteAccessState, isActiveInviteUniqueConstraintError } from "@/lib/disc-invites";
 import { logServerEvent } from "@/lib/logger";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { buildResultLink, ensureAssessmentResultShare } from "@/lib/disc-result-share";
@@ -151,6 +151,10 @@ export async function createAssessmentInvite(
 
     return { status: "success", message: sendInviteEmail ? "Invite created and email sent." : "Invite created." };
   } catch (error) {
+    if (isActiveInviteUniqueConstraintError(error)) {
+      return { status: "error", message: "An active invite already exists for this candidate email." };
+    }
+
     logServerEvent("error", "disc_invite_create_failed", {
       companyId,
       userId: user.id,
