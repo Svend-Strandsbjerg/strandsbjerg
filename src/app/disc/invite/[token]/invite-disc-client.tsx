@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useActionState, useMemo, useState } from "react";
 
 import {
@@ -72,9 +71,12 @@ export function InviteDiscClient({ token, candidateLabel, inviteState, latestAss
         {latestAssessment.resultLink ? (
           <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/70 bg-muted/20 p-3">
             <CopyResultLinkButton resultLink={latestAssessment.resultLink} />
-            <Button asChild variant="outline" className="h-8 text-xs">
-              <Link href={latestAssessment.resultLink}>Open shared result</Link>
-            </Button>
+            <a
+              href={latestAssessment.resultLink}
+              className="inline-flex h-8 items-center justify-center rounded-full border border-border bg-card px-5 py-2.5 text-xs font-medium text-foreground transition hover:bg-muted"
+            >
+              Open shared result
+            </a>
           </div>
         ) : (
           <p className="text-xs text-muted-foreground">A permanent result link will appear once processing completes.</p>
@@ -84,7 +86,7 @@ export function InviteDiscClient({ token, candidateLabel, inviteState, latestAss
   }
 
   if (inviteState === "completed") {
-    return <p className="text-sm text-muted-foreground">This invite has already been completed.</p>;
+    return <p className="text-sm text-muted-foreground">This invite has already been completed and can no longer be used.</p>;
   }
 
   if (inviteState === "expired") {
@@ -97,7 +99,7 @@ export function InviteDiscClient({ token, candidateLabel, inviteState, latestAss
 
   return (
     <div className="space-y-5">
-      <p className="text-sm text-muted-foreground">Invite for {candidateLabel}. Start and submit your DISC assessment below.</p>
+      <p className="text-sm text-muted-foreground">Invite for {candidateLabel}. Start, complete, and submit your DISC assessment below.</p>
 
       <form action={startAction}>
         <input type="hidden" name="token" value={token} />

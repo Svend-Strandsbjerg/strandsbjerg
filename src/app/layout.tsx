@@ -4,6 +4,7 @@ import { PublicPageShell } from "@/components/layout/public-shell";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { ThemeProvider } from "@/components/layout/theme-provider";
+import { validateEnvironment } from "@/lib/env-validation";
 
 
 export const metadata: Metadata = {
@@ -13,6 +14,8 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  validateEnvironment();
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="font-sans">

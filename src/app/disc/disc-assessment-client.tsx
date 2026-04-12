@@ -39,7 +39,7 @@ function StartAssessmentButton({
 }) {
   return (
     <form action={action}>
-      <Button type="submit" disabled={disabled ?? loading || hasStartedSession}>
+      <Button type="submit" disabled={disabled ?? (loading || hasStartedSession)}>
         {loading ? "Starting session..." : hasStartedSession ? "Session active" : "Take DISC assessment"}
       </Button>
     </form>

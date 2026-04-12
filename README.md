@@ -25,6 +25,13 @@ Production-style Next.js foundation for a professional personal brand with a pro
 - `/familie/events/[id]` detail + multi-select voting
 - aggregate vote counts + voter visibility by date
 
+### DISC module
+
+- personal DISC assessment flow
+- company invite flow for recruiters/admins
+- token-based result sharing + PDF download
+- email sending for invites and result sharing
+
 ## Local setup
 
 1. Install dependencies
@@ -59,6 +66,42 @@ npm run prisma:seed
 ```bash
 npm run dev
 ```
+
+## Environment variables
+
+### Core required (startup validated)
+
+The app fails fast if these are missing:
+
+- `DATABASE_URL`
+- `DISC_ENGINE_BASE_URL`
+- `DISC_ENGINE_API_KEY`
+- `DISC_ENGINE_ASSESSMENT_VERSION_ID`
+- `RESEND_API_KEY`
+- one of:
+  - `DISC_EMAIL_FROM`, or
+  - `RESEND_FROM_EMAIL`
+
+### Auth-related
+
+- `AUTH_SECRET`
+- optional provider vars depending on login methods used:
+  - `AUTH_GOOGLE_ID`
+  - `AUTH_GOOGLE_SECRET`
+  - `AUTH_RESEND_KEY`
+  - `AUTH_EMAIL_FROM`
+
+## Staging acceptance testing (DISC)
+
+For a full recruiter/candidate/manual acceptance checklist, see:
+
+- [`docs/staging-disc-manual-testing.md`](docs/staging-disc-manual-testing.md)
+
+This includes:
+
+- exact invite/start/submit/result/PDF/resend manual test flow
+- pre-flight staging checks
+- troubleshooting for env/database/DISC engine/email issues
 
 ## Authentication setup
 

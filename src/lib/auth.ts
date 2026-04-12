@@ -6,6 +6,7 @@ import Google from "next-auth/providers/google";
 import Resend from "next-auth/providers/resend";
 
 import { verifyPassword } from "@/lib/password";
+import { logServerEvent } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 
 const authSecret =
@@ -152,7 +153,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           },
         });
       } catch (error) {
-        console.error("Failed to record login activity", error);
+        logServerEvent("error", "login_activity_record_failed", { userId: user.id, error });
       }
     },
   },

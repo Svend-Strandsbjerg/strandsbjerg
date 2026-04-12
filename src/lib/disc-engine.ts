@@ -1,6 +1,6 @@
 import "server-only";
 
-const DEFAULT_DISC_ENGINE_BASE_URL = "https://disc-engine-production.up.railway.app";
+import { logServerEvent } from "@/lib/logger";
 
 export type DiscEngineSessionMetadata = {
   source: "strandsbjerg";
@@ -44,7 +44,7 @@ class DiscEngineError extends Error {
   }
 }
 
-function getRequiredEnv(name: "DISC_ENGINE_API_KEY" | "DISC_ENGINE_ASSESSMENT_VERSION_ID") {
+function getRequiredEnv(name: "DISC_ENGINE_BASE_URL" | "DISC_ENGINE_API_KEY" | "DISC_ENGINE_ASSESSMENT_VERSION_ID") {
   const value = process.env[name];
 
   if (!value) {
@@ -52,10 +52,6 @@ function getRequiredEnv(name: "DISC_ENGINE_API_KEY" | "DISC_ENGINE_ASSESSMENT_VE
   }
 
   return value;
-}
-
-function getDiscEngineBaseUrl() {
-  return process.env.DISC_ENGINE_BASE_URL || DEFAULT_DISC_ENGINE_BASE_URL;
 }
 
 export function validateDiscResponses(payload: unknown): DiscResponseInput[] {
@@ -88,7 +84,7 @@ export function validateDiscResponses(payload: unknown): DiscResponseInput[] {
 
 async function discEngineRequest<TResponse>(path: string, payload: unknown): Promise<TResponse> {
   const apiKey = getRequiredEnv("DISC_ENGINE_API_KEY");
-  const baseUrl = getDiscEngineBaseUrl();
+  const baseUrl = getRequiredEnv("DISC_ENGINE_BASE_URL");
 
   let response: Response;
 
@@ -103,7 +99,7 @@ async function discEngineRequest<TResponse>(path: string, payload: unknown): Pro
       cache: "no-store",
     });
   } catch (error) {
-    console.error("[disc-engine] request_failed", { path, error });
+    logServerEvent("error", "disc_engine_request_failed", { path, error });
     throw new DiscEngineError(`Failed to call disc-engine ${path}`);
   }
 
@@ -115,10 +111,10 @@ async function discEngineRequest<TResponse>(path: string, payload: unknown): Pro
   }
 
   if (!response.ok) {
-    console.error("[disc-engine] request_non_ok", {
+    logServerEvent("error", "disc_engine_non_ok_response", {
       path,
       status: response.status,
-      body: parsedBody,
+      hasBody: Boolean(parsedBody),
     });
     throw new DiscEngineError(`disc-engine ${path} failed with status ${response.status}`, response.status, parsedBody);
   }
@@ -139,7 +135,9 @@ export async function createDiscSession(): Promise<CreateDiscSessionResponse> {
   const result = await discEngineRequest<CreateDiscSessionResponse>("/sessions", payload);
 
   if (!result || typeof result.sessionId !== "string" || result.sessionId.length === 0) {
-    console.error("[disc-engine] malformed_session_response", { result });
+    logServerEvent("error", "disc_engine_malformed_session_response", {
+      hasResult: Boolean(result),
+    });
     throw new DiscEngineError("disc-engine /sessions returned an invalid payload");
   }
 
@@ -159,7 +157,9 @@ export async function submitDiscResponses(input: SubmitDiscResponsesRequest): Pr
   });
 
   if (!result || typeof result !== "object") {
-    console.error("[disc-engine] malformed_submit_response", { result });
+    logServerEvent("error", "disc_engine_malformed_responses_response", {
+      sessionId: input.sessionId,
+    });
     throw new DiscEngineError("disc-engine /responses returned an invalid payload");
   }
 

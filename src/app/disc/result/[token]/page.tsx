@@ -21,8 +21,8 @@ export default async function DiscResultSharePage({ params }: DiscResultSharePag
   if (access.status === "expired") {
     return (
       <div className="mx-auto max-w-2xl space-y-4 rounded-3xl border border-border/80 bg-card p-6 shadow-sm sm:p-8">
-        <h1 className="text-2xl font-semibold tracking-tight">DISC result link expired</h1>
-        <p className="text-sm text-muted-foreground">This result link has expired. Please request a new shared link from the company.</p>
+        <h1 className="text-2xl font-semibold tracking-tight">Result link expired</h1>
+        <p className="text-sm text-muted-foreground">This result link has expired. Please ask the recruiter to send a new result link.</p>
       </div>
     );
   }

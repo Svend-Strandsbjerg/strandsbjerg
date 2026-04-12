@@ -6,7 +6,9 @@ import { AssessmentInviteStatus } from "@prisma/client";
 import { createDiscAssessmentRecord, markDiscAssessmentSubmitted } from "@/lib/disc-assessment";
 import { DiscEngineError, createDiscSession, submitDiscResponses, validateDiscResponses } from "@/lib/disc-engine";
 import { getInviteAccessState } from "@/lib/disc-invites";
+import { logServerEvent } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 export type InviteDiscState = {
   status: "idle" | "success" | "error";
@@ -42,6 +44,11 @@ async function getActiveInviteOrThrow(token: string) {
   });
 
   if (!invite || getInviteAccessState(invite.status, invite.expiresAt) !== "active") {
+    logServerEvent("warn", "disc_invite_invalid_token_access", {
+      inviteToken: token,
+      hasInvite: Boolean(invite),
+      status: invite?.status,
+    });
     throw new Error("Invite not valid");
   }
 
@@ -53,6 +60,15 @@ export async function startInviteDiscAssessment(_: InviteDiscState, formData: Fo
 
   if (!token) {
     return { status: "error", message: "Invalid invite token.", sessionId: "" };
+  }
+
+  const rateLimit = enforceRateLimit({
+    key: `invite-start:${token}`,
+    limit: 10,
+    windowMs: 60_000,
+  });
+  if (!rateLimit.ok) {
+    return { status: "error", message: "Too many attempts. Please wait a minute and try again.", sessionId: "" };
   }
 
   try {
@@ -88,10 +104,23 @@ export async function startInviteDiscAssessment(_: InviteDiscState, formData: Fo
       message: "DISC session created.",
       sessionId: createdSession.sessionId,
     };
-  } catch {
+  } catch (error) {
+    logServerEvent("error", "disc_invite_start_failed", {
+      inviteToken: token,
+      error,
+    });
+
+    if (error instanceof Error && error.message === "Invite not valid") {
+      return {
+        status: "error",
+        message: "This invite is invalid, expired, or already completed.",
+        sessionId: "",
+      };
+    }
+
     return {
       status: "error",
-      message: "This invite is invalid, expired, or already completed.",
+      message: toErrorMessage(error, "Unable to start the DISC assessment right now. Please try again shortly."),
       sessionId: "",
     };
   }
@@ -104,6 +133,16 @@ export async function submitInviteDiscAssessment(_: InviteDiscState, formData: F
 
   if (!token || !sessionId) {
     return { status: "error", message: "Invalid submission request.", sessionId: "" };
+  }
+
+  const rateLimit = enforceRateLimit({
+    key: `invite-submit:${token}:${sessionId}`,
+    limit: 3,
+    windowMs: 60_000,
+  });
+
+  if (!rateLimit.ok) {
+    return { status: "error", message: "Too many submission attempts. Please wait before trying again.", sessionId };
   }
 
   let parsedResponses: unknown;
@@ -138,8 +177,8 @@ export async function submitInviteDiscAssessment(_: InviteDiscState, formData: F
     await submitDiscResponses({ sessionId, responses: validatedResponses });
     await markDiscAssessmentSubmitted({ externalSessionId: sessionId, rawResponses: validatedResponses });
 
-    await prisma.assessmentInvite.update({
-      where: { id: invite.id },
+    await prisma.assessmentInvite.updateMany({
+      where: { id: invite.id, status: AssessmentInviteStatus.ACTIVE },
       data: { status: AssessmentInviteStatus.COMPLETED },
     });
 
@@ -147,6 +186,12 @@ export async function submitInviteDiscAssessment(_: InviteDiscState, formData: F
 
     return { status: "success", message: "Responses submitted successfully.", sessionId };
   } catch (error) {
+    logServerEvent("error", "disc_invite_submit_failed", {
+      inviteToken: token,
+      sessionId,
+      error,
+    });
+
     return {
       status: "error",
       message: toErrorMessage(error, "Unable to submit responses right now."),

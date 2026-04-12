@@ -52,20 +52,26 @@ export async function markDiscAssessmentSubmitted(params: {
   externalSessionId: string;
   rawResponses: Prisma.InputJsonValue;
 }) {
-  const assessment = await prisma.discAssessment.upsert({
-    where: { externalSessionId: params.externalSessionId },
-    update: {
-      rawResponses: params.rawResponses,
-      status: DiscAssessmentStatus.SUBMITTED,
-      submittedAt: new Date(),
-    },
-    create: {
+  const submittedAt = new Date();
+
+  const updated = await prisma.discAssessment.updateMany({
+    where: {
       externalSessionId: params.externalSessionId,
-      assessmentVersionId: getConfiguredDiscAssessmentVersionId(),
-      status: DiscAssessmentStatus.SUBMITTED,
-      submittedAt: new Date(),
-      rawResponses: params.rawResponses,
+      status: DiscAssessmentStatus.STARTED,
     },
+    data: {
+      rawResponses: params.rawResponses,
+      status: DiscAssessmentStatus.SUBMITTED,
+      submittedAt,
+    },
+  });
+
+  if (updated.count === 0) {
+    throw new Error("Assessment is already submitted or unavailable.");
+  }
+
+  const assessment = await prisma.discAssessment.findUniqueOrThrow({
+    where: { externalSessionId: params.externalSessionId },
   });
 
   await ensureAssessmentResultShare(assessment.id);

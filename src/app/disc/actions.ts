@@ -5,6 +5,8 @@ import { cookies } from "next/headers";
 import { auth } from "@/lib/auth";
 import { createDiscAssessmentRecord, markDiscAssessmentSubmitted } from "@/lib/disc-assessment";
 import { DiscEngineError, createDiscSession, submitDiscResponses, validateDiscResponses } from "@/lib/disc-engine";
+import { logServerEvent } from "@/lib/logger";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 const DISC_SESSION_COOKIE = "disc_session_id";
 const DISC_SUBMITTED_COOKIE = "disc_submitted_session_id";
@@ -31,13 +33,13 @@ function toErrorMessage(error: unknown, fallback: string) {
 
 export async function startDiscAssessment(_: DiscFlowState): Promise<DiscFlowState> {
   const session = await auth();
-  const userId = session?.user?.id ?? null;
+  const userId = session?.user?.id ?? "anonymous";
   const cookieStore = await cookies();
   const existingSessionId = cookieStore.get(DISC_SESSION_COOKIE)?.value;
   const submittedSessionId = cookieStore.get(DISC_SUBMITTED_COOKIE)?.value;
 
   if (existingSessionId && existingSessionId !== submittedSessionId) {
-    console.info("[disc-flow] session_reused", { userId, sessionId: existingSessionId });
+    logServerEvent("info", "disc_flow_session_reused", { userId, sessionId: existingSessionId });
     return {
       status: "success",
       message: "Existing DISC session restored.",
@@ -45,11 +47,20 @@ export async function startDiscAssessment(_: DiscFlowState): Promise<DiscFlowSta
     };
   }
 
+  const rateLimit = enforceRateLimit({ key: `disc-start:${userId}`, limit: 6, windowMs: 60_000 });
+  if (!rateLimit.ok) {
+    return {
+      status: "error",
+      message: "Too many start attempts. Please wait a minute and try again.",
+      sessionId: "",
+    };
+  }
+
   try {
     const createdSession = await createDiscSession();
     await createDiscAssessmentRecord({
       externalSessionId: createdSession.sessionId,
-      userId,
+      userId: session?.user?.id ?? null,
     });
 
     cookieStore.set(DISC_SESSION_COOKIE, createdSession.sessionId, {
@@ -61,7 +72,7 @@ export async function startDiscAssessment(_: DiscFlowState): Promise<DiscFlowSta
     });
     cookieStore.delete(DISC_SUBMITTED_COOKIE);
 
-    console.info("[disc-flow] session_created", { userId, sessionId: createdSession.sessionId });
+    logServerEvent("info", "disc_flow_session_created", { userId, sessionId: createdSession.sessionId });
 
     return {
       status: "success",
@@ -69,7 +80,7 @@ export async function startDiscAssessment(_: DiscFlowState): Promise<DiscFlowSta
       sessionId: createdSession.sessionId,
     };
   } catch (error) {
-    console.error("[disc-flow] session_create_failed", { userId, error });
+    logServerEvent("error", "disc_flow_session_create_failed", { userId, error });
 
     return {
       status: "error",
@@ -81,7 +92,7 @@ export async function startDiscAssessment(_: DiscFlowState): Promise<DiscFlowSta
 
 export async function submitDiscAssessmentResponses(_: DiscFlowState, formData: FormData): Promise<DiscFlowState> {
   const session = await auth();
-  const userId = session?.user?.id ?? null;
+  const userId = session?.user?.id ?? "anonymous";
   const cookieStore = await cookies();
 
   const submittedSessionId = cookieStore.get(DISC_SUBMITTED_COOKIE)?.value;
@@ -107,11 +118,20 @@ export async function submitDiscAssessmentResponses(_: DiscFlowState, formData: 
   }
 
   if (cookieSessionId && formSessionId && cookieSessionId !== formSessionId) {
-    console.warn("[disc-flow] session_id_mismatch", { userId, formSessionId, cookieSessionId });
+    logServerEvent("warn", "disc_flow_session_id_mismatch", { userId, sessionId });
     return {
       status: "error",
       message: "Session mismatch detected. Please restart the DISC session.",
       sessionId: "",
+    };
+  }
+
+  const rateLimit = enforceRateLimit({ key: `disc-submit:${userId}:${sessionId}`, limit: 3, windowMs: 60_000 });
+  if (!rateLimit.ok) {
+    return {
+      status: "error",
+      message: "Too many submit attempts. Please wait before trying again.",
+      sessionId,
     };
   }
 
@@ -155,7 +175,7 @@ export async function submitDiscAssessmentResponses(_: DiscFlowState, formData: 
       maxAge: 60 * 60,
     });
 
-    console.info("[disc-flow] responses_submitted", { userId, sessionId, responseCount: validatedResponses.length });
+    logServerEvent("info", "disc_flow_responses_submitted", { userId, sessionId, responseCount: validatedResponses.length });
 
     return {
       status: "success",
@@ -163,7 +183,7 @@ export async function submitDiscAssessmentResponses(_: DiscFlowState, formData: 
       sessionId,
     };
   } catch (error) {
-    console.error("[disc-flow] responses_submit_failed", { userId, sessionId, error });
+    logServerEvent("error", "disc_flow_responses_submit_failed", { userId, sessionId, error });
 
     return {
       status: "error",

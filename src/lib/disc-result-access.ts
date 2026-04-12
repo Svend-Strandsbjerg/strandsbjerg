@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
+import { logServerEvent } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 
 export type SharedDiscResultRecord = Prisma.AssessmentResultShareGetPayload<{
@@ -33,10 +34,12 @@ export async function getSharedDiscResultAccess(token: string): Promise<SharedRe
   });
 
   if (!sharedResult) {
+    logServerEvent("warn", "disc_result_invalid_token_access", { resultToken: token, reason: "missing" });
     return { status: "missing" };
   }
 
   if (sharedResult.expiresAt && sharedResult.expiresAt.getTime() < Date.now()) {
+    logServerEvent("warn", "disc_result_invalid_token_access", { resultToken: token, reason: "expired" });
     return { status: "expired" };
   }
 
