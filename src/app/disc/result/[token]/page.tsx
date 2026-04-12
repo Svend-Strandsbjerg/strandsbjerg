@@ -30,6 +30,7 @@ export default async function DiscResultSharePage({ params }: DiscResultSharePag
   const assessment = access.sharedResult.assessment;
   const companyName = assessment.company?.name;
   const candidateLabel = assessment.candidateName ?? assessment.candidateEmail ?? undefined;
+  const isCompleted = Boolean(assessment.submittedAt);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 rounded-3xl border border-border/80 bg-card p-6 shadow-sm sm:p-8">
@@ -43,6 +44,16 @@ export default async function DiscResultSharePage({ params }: DiscResultSharePag
           {candidateLabel ? <p className="text-sm font-medium text-foreground">Candidate: {candidateLabel}</p> : null}
         </div>
       </header>
+
+      {isCompleted ? (
+        <section className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
+          <h2 className="text-base font-semibold text-emerald-900">Your DISC assessment has been completed</h2>
+          <p className="mt-1 text-sm text-emerald-900/90">
+            {companyName ? `The company (${companyName}) can now review your result.` : "The company can now review your result."}
+          </p>
+          <p className="mt-2 text-xs text-emerald-800/90">You can return to this page anytime using this link.</p>
+        </section>
+      ) : null}
 
       <div className="flex items-center justify-between gap-4">
         <p className="text-xs text-muted-foreground">This secure link provides view-only access to a completed DISC assessment.</p>
