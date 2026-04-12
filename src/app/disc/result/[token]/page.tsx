@@ -39,8 +39,8 @@ export default async function DiscResultSharePage({ params }: DiscResultSharePag
           DISC highlights how people tend to communicate, make decisions, and collaborate at work.
         </p>
         <div className="space-y-1">
+          {companyName ? <p className="text-sm text-muted-foreground">You have been invited by {companyName}.</p> : null}
           {candidateLabel ? <p className="text-sm font-medium text-foreground">Candidate: {candidateLabel}</p> : null}
-          {companyName ? <p className="text-xs text-muted-foreground">Shared by {companyName}</p> : null}
         </div>
       </header>
 
