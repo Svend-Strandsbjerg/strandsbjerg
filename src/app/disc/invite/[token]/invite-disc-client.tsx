@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useMemo } from "react";
+import Link from "next/link";
+import { useActionState, useMemo, useState } from "react";
 
 import {
   initialInviteDiscState,
@@ -16,13 +17,34 @@ type InviteDiscClientProps = {
   candidateLabel: string;
   inviteState: "active" | "expired" | "invalidated" | "completed";
   latestAssessment: {
+    id: string;
     status: "STARTED" | "SUBMITTED" | "FAILED";
     createdAt: Date;
     submittedAt: Date | null;
     externalSessionId: string;
     rawResponses: unknown;
+    resultLink: string | null;
   } | null;
 };
+
+function CopyResultLinkButton({ resultLink }: { resultLink: string }) {
+  const [copied, setCopied] = useState(false);
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      className="h-8 text-xs"
+      onClick={async () => {
+        await navigator.clipboard.writeText(resultLink);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      }}
+    >
+      {copied ? "Copied" : "Copy result link"}
+    </Button>
+  );
+}
 
 export function InviteDiscClient({ token, candidateLabel, inviteState, latestAssessment }: InviteDiscClientProps) {
   const [startState, startAction, starting] = useActionState(startInviteDiscAssessment, initialInviteDiscState);
@@ -46,6 +68,17 @@ export function InviteDiscClient({ token, candidateLabel, inviteState, latestAss
           identityLabel={candidateLabel}
           emptyMessage="This invite was completed, but the result payload is incomplete."
         />
+
+        {latestAssessment.resultLink ? (
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/70 bg-muted/20 p-3">
+            <CopyResultLinkButton resultLink={latestAssessment.resultLink} />
+            <Button asChild variant="outline" className="h-8 text-xs">
+              <Link href={latestAssessment.resultLink}>Open shared result</Link>
+            </Button>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">A permanent result link will appear once processing completes.</p>
+        )}
       </div>
     );
   }
