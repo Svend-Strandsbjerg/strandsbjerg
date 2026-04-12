@@ -1,7 +1,5 @@
-import "server-only";
-
 import crypto from "node:crypto";
-import { AssessmentInviteStatus } from "@prisma/client";
+import { AssessmentInviteStatus, Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 
@@ -47,4 +45,16 @@ export function getInviteAccessState(status: AssessmentInviteStatus, expiresAt: 
   }
 
   return "active";
+}
+
+export function isActiveInviteUniqueConstraintError(error: unknown) {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") {
+    return false;
+  }
+
+  const target = error.meta?.target;
+  return (
+    target === "assessment_invites_active_candidate_unique" ||
+    (Array.isArray(target) && target.includes("assessment_invites_active_candidate_unique"))
+  );
 }

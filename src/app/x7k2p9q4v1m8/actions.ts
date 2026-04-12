@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requireFamilyAccessUser } from "@/lib/access";
+import { ensureDateOptionsMatchEvent } from "@/lib/family-votes";
 import { FAMILY_PRIVATE_BASE_PATH } from "@/lib/private-routes";
 import { prisma } from "@/lib/prisma";
 
@@ -53,21 +54,37 @@ export async function voteForEvent(formData: FormData) {
     throw new Error("Missing vote selection");
   }
 
-  await prisma.vote.deleteMany({
+  const matchingOptionCount = await prisma.eventDateOption.count({
     where: {
-      userId,
-      dateOption: {
-        eventId,
+      eventId,
+      id: {
+        in: selectedOptions,
       },
     },
   });
 
-  await prisma.vote.createMany({
-    data: selectedOptions.map((dateOptionId) => ({
-      dateOptionId,
-      userId,
-    })),
-    skipDuplicates: true,
+  ensureDateOptionsMatchEvent({
+    selectedOptionCount: selectedOptions.length,
+    matchingOptionCount,
+  });
+
+  await prisma.$transaction(async (tx) => {
+    await tx.vote.deleteMany({
+      where: {
+        userId,
+        dateOption: {
+          eventId,
+        },
+      },
+    });
+
+    await tx.vote.createMany({
+      data: selectedOptions.map((dateOptionId) => ({
+        dateOptionId,
+        userId,
+      })),
+      skipDuplicates: true,
+    });
   });
 
   revalidatePath(`${FAMILY_PRIVATE_BASE_PATH}/events/${eventId}`);
