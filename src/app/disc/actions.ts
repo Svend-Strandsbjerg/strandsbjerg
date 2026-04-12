@@ -3,6 +3,7 @@
 import { cookies } from "next/headers";
 
 import { auth } from "@/lib/auth";
+import { createDiscAssessmentRecord, markDiscAssessmentSubmitted } from "@/lib/disc-assessment";
 import { DiscEngineError, createDiscSession, submitDiscResponses, validateDiscResponses } from "@/lib/disc-engine";
 
 const DISC_SESSION_COOKIE = "disc_session_id";
@@ -46,6 +47,10 @@ export async function startDiscAssessment(_: DiscFlowState): Promise<DiscFlowSta
 
   try {
     const createdSession = await createDiscSession();
+    await createDiscAssessmentRecord({
+      externalSessionId: createdSession.sessionId,
+      userId,
+    });
 
     cookieStore.set(DISC_SESSION_COOKIE, createdSession.sessionId, {
       httpOnly: true,
@@ -136,6 +141,10 @@ export async function submitDiscAssessmentResponses(_: DiscFlowState, formData: 
     await submitDiscResponses({
       sessionId,
       responses: validatedResponses,
+    });
+    await markDiscAssessmentSubmitted({
+      externalSessionId: sessionId,
+      rawResponses: validatedResponses,
     });
 
     cookieStore.set(DISC_SUBMITTED_COOKIE, sessionId, {

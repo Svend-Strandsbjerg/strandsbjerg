@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useMemo } from "react";
 
 import {
@@ -10,7 +11,18 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
-export function DiscAssessmentClient() {
+type DiscAssessmentClientProps = {
+  userId: string | null;
+  assessments: Array<{
+    id: string;
+    status: "STARTED" | "SUBMITTED" | "FAILED";
+    externalSessionId: string;
+    createdAt: Date;
+    submittedAt: Date | null;
+  }>;
+};
+
+export function DiscAssessmentClient({ userId, assessments }: DiscAssessmentClientProps) {
   const [startState, startAction, starting] = useActionState(startDiscAssessment, initialDiscFlowState);
   const [submitState, submitAction, submitting] = useActionState(submitDiscAssessmentResponses, initialDiscFlowState);
 
@@ -25,6 +37,11 @@ export function DiscAssessmentClient() {
         <p className="text-sm text-muted-foreground">
           Starts a DISC session on the server and submits responses via the server-side integration layer.
         </p>
+        {userId ? (
+          <p className="text-xs text-muted-foreground">
+            Need to invite a candidate? <Link className="underline" href="/disc/company">Open company DISC admin</Link>
+          </p>
+        ) : null}
       </div>
 
       <form action={startAction}>
@@ -65,6 +82,27 @@ export function DiscAssessmentClient() {
 
       {submitState.status !== "idle" ? (
         <p className={submitState.status === "error" ? "text-sm text-destructive" : "text-sm text-emerald-700"}>{submitState.message}</p>
+      ) : null}
+
+      {userId ? (
+        <div className="space-y-2 rounded-xl border border-border/80 bg-muted/20 p-4">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Your persisted assessments</h2>
+          {assessments.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No saved assessments yet.</p>
+          ) : (
+            <ul className="space-y-2 text-sm">
+              {assessments.map((assessment) => (
+                <li key={assessment.id} className="rounded-lg border border-border/70 p-2">
+                  <p>Session: {assessment.externalSessionId}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Status: {assessment.status.toLowerCase()} · Created: {assessment.createdAt.toISOString().slice(0, 10)} · Submitted:{" "}
+                    {assessment.submittedAt ? assessment.submittedAt.toISOString().slice(0, 10) : "-"}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       ) : null}
     </div>
   );
