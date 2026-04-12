@@ -85,12 +85,16 @@ export function createDiscResultPdf(shared: SharedDiscResultRecord) {
   const assessment = shared.assessment;
   const completionDate = assessment.submittedAt ?? assessment.createdAt;
   const { dominantInsight, secondaryInsight, interpretationText } = buildDiscInsights(assessment.rawResponses);
+  const candidateLabel = assessment.candidateName ?? assessment.candidateEmail ?? "Candidate";
+  const companyLabel = assessment.company?.name;
 
   const lines: string[] = [
-    "DISC Assessment Result",
+    "DISC Profile Result",
+    "DISC highlights how people tend to communicate, make decisions, and collaborate at work.",
     "",
+    ...(companyLabel ? [`You have been invited by ${companyLabel}.`] : []),
+    `Candidate: ${candidateLabel}`,
     `Completed: ${formatDate(completionDate)}`,
-    `Profile: ${assessment.candidateName ?? assessment.candidateEmail ?? "Candidate"}`,
     "",
     "Your profile summary",
     dominantInsight
@@ -121,7 +125,7 @@ export function createDiscResultPdf(shared: SharedDiscResultRecord) {
     lines.push(...wrapLine(interpretationText));
   }
 
-  lines.push("", "Generated from secure DISC result share link.");
+  lines.push("", "This assessment was generated using the DISC framework.");
 
   return buildPdfBytes(lines.slice(0, 220));
 }

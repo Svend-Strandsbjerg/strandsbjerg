@@ -26,6 +26,11 @@ export default async function InviteDiscPage({ params }: InviteDiscPageProps) {
   const invite = await prisma.assessmentInvite.findUnique({
     where: { token },
     include: {
+      company: {
+        select: {
+          name: true,
+        },
+      },
       assessments: {
         orderBy: { createdAt: "desc" },
         take: 1,
@@ -52,6 +57,9 @@ export default async function InviteDiscPage({ params }: InviteDiscPageProps) {
     <div className="mx-auto max-w-2xl space-y-6 rounded-3xl border border-border/80 bg-card p-6 shadow-sm sm:p-8">
       <div className="space-y-2">
         <h1 className="text-2xl font-semibold tracking-tight">Candidate DISC assessment</h1>
+        {invite.company?.name ? (
+          <p className="text-sm text-muted-foreground">You have been invited by {invite.company.name}.</p>
+        ) : null}
         <p className="text-sm text-muted-foreground">Complete the invited DISC assessment and review your result.</p>
       </div>
 
