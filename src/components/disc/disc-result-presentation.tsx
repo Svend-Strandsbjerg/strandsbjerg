@@ -11,6 +11,52 @@ type DiscResultPresentationProps = {
   emptyMessage?: string;
 };
 
+type DiscDimension = "D" | "I" | "S" | "C";
+
+type DimensionInsight = {
+  label: string;
+  summary: string;
+  strengths: string[];
+  challenges: string[];
+  communication: string;
+  workStyle: string;
+};
+
+const DISC_DIMENSION_MAP: Record<DiscDimension, DimensionInsight> = {
+  D: {
+    label: "Dominance (D)",
+    summary: "Direct, results-oriented, and comfortable taking charge in uncertain situations.",
+    strengths: ["Moves quickly toward decisions", "Takes ownership under pressure", "Challenges blockers to keep momentum"],
+    challenges: ["May appear too blunt in sensitive conversations", "Can overlook consensus when speed is prioritized"],
+    communication: "Prefers concise communication focused on outcomes, decisions, and clear priorities.",
+    workStyle: "Works best with autonomy, ambitious targets, and room to lead execution.",
+  },
+  I: {
+    label: "Influence (I)",
+    summary: "Engaging, persuasive, and energized by collaboration and visible progress.",
+    strengths: ["Builds rapport quickly", "Motivates teams with optimism", "Explains ideas in an accessible way"],
+    challenges: ["May lose detail when moving fast", "Can overcommit when enthusiasm is high"],
+    communication: "Responds well to conversational, positive dialogue with room for idea exchange.",
+    workStyle: "Works best in collaborative environments with recognition, people contact, and creative problem-solving.",
+  },
+  S: {
+    label: "Steadiness (S)",
+    summary: "Reliable, patient, and focused on stability, support, and long-term consistency.",
+    strengths: ["Creates dependable routines", "Supports team cohesion", "Remains calm in changing situations"],
+    challenges: ["May delay difficult trade-off decisions", "Can resist abrupt change without context"],
+    communication: "Prefers respectful, steady communication with clear expectations and practical next steps.",
+    workStyle: "Works best with predictable processes, supportive teams, and clarity around responsibilities.",
+  },
+  C: {
+    label: "Conscientiousness (C)",
+    summary: "Analytical, quality-focused, and attentive to structure, standards, and risk.",
+    strengths: ["Delivers high-quality output", "Identifies risks early", "Builds robust, well-structured solutions"],
+    challenges: ["May overanalyze before acting", "Can become perfectionistic under tight deadlines"],
+    communication: "Prefers precise, evidence-based communication with clear criteria and rationale.",
+    workStyle: "Works best where quality standards are explicit and careful planning is valued.",
+  },
+};
+
 function formatDate(value: Date | null) {
   if (!value) {
     return "-";
@@ -37,6 +83,55 @@ function normalizeResponseRecords(rawResponses: unknown): ResponseRecord[] {
   return [];
 }
 
+function normalizeToDiscDimension(value: unknown): DiscDimension | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = value.trim().toUpperCase();
+
+  if (normalized === "D" || normalized === "DOMINANCE") {
+    return "D";
+  }
+
+  if (normalized === "I" || normalized === "INFLUENCE") {
+    return "I";
+  }
+
+  if (normalized === "S" || normalized === "STEADINESS") {
+    return "S";
+  }
+
+  if (normalized === "C" || normalized === "CONSCIENTIOUSNESS" || normalized === "COMPLIANCE") {
+    return "C";
+  }
+
+  return null;
+}
+
+function extractDimensionCounts(records: ResponseRecord[]) {
+  const counts: Record<DiscDimension, number> = {
+    D: 0,
+    I: 0,
+    S: 0,
+    C: 0,
+  };
+
+  for (const entry of records) {
+    const candidates = [entry.dimension, entry.trait, entry.value, entry.discDimension];
+
+    for (const candidate of candidates) {
+      const dimension = normalizeToDiscDimension(candidate);
+      if (dimension) {
+        counts[dimension] += 1;
+        break;
+      }
+    }
+  }
+
+  return counts;
+}
+
 function getInterpretationText(rawResponses: unknown) {
   if (!rawResponses || typeof rawResponses !== "object") {
     return null;
@@ -52,25 +147,6 @@ function getInterpretationText(rawResponses: unknown) {
   }
 
   return null;
-}
-
-function getProfileTraits(records: ResponseRecord[]) {
-  const valueCounts = new Map<string, number>();
-
-  for (const entry of records) {
-    const rawValue = entry.value;
-    if (typeof rawValue === "string" || typeof rawValue === "number") {
-      const key = String(rawValue).trim();
-      if (key) {
-        valueCounts.set(key, (valueCounts.get(key) ?? 0) + 1);
-      }
-    }
-  }
-
-  return [...valueCounts.entries()]
-    .map(([label, count]) => ({ label, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 6);
 }
 
 function getDimensionSamples(records: ResponseRecord[]) {
@@ -111,7 +187,12 @@ export function DiscResultPresentation({
 }: DiscResultPresentationProps) {
   const records = normalizeResponseRecords(rawResponses);
   const interpretationText = getInterpretationText(rawResponses);
-  const profileTraits = getProfileTraits(records);
+  const dimensionCounts = extractDimensionCounts(records);
+  const rankedDimensions = (Object.entries(dimensionCounts) as Array<[DiscDimension, number]>).sort((a, b) => b[1] - a[1]);
+  const dominantDimension = rankedDimensions[0]?.[1] > 0 ? rankedDimensions[0][0] : null;
+  const secondaryDimension = rankedDimensions[1]?.[1] > 0 ? rankedDimensions[1][0] : null;
+  const dominantInsight = dominantDimension ? DISC_DIMENSION_MAP[dominantDimension] : null;
+  const secondaryInsight = secondaryDimension ? DISC_DIMENSION_MAP[secondaryDimension] : null;
   const dimensionSamples = getDimensionSamples(records);
   const completionDate = submittedAt ?? (status === "SUBMITTED" ? createdAt : null);
 
@@ -142,54 +223,71 @@ export function DiscResultPresentation({
         </p>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2">
-        <section className="rounded-xl border border-border/70 p-4">
-          <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Summary</h4>
-          <p className="mt-2 text-sm text-muted-foreground">{records.length} responses captured for this completed assessment.</p>
-          {profileTraits.length > 0 ? (
-            <ul className="mt-3 space-y-1 text-sm">
-              {profileTraits.slice(0, 3).map((item) => (
-                <li key={item.label}>
-                  <span className="font-medium">{item.label}</span>: {item.count}
-                </li>
+      <section className="rounded-xl border border-border/70 p-4">
+        <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Your profile summary</h4>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {dominantInsight
+            ? `${dominantInsight.label} appears most prominent in this result${secondaryInsight ? `, with support from ${secondaryInsight.label}` : ""}.`
+            : "A completed response set is available, but a dominant DISC dimension could not be inferred from the current payload."}
+        </p>
+        {dominantInsight ? <p className="mt-2 text-sm text-muted-foreground">{dominantInsight.summary}</p> : null}
+        {interpretationText ? <p className="mt-2 text-sm text-muted-foreground">{interpretationText}</p> : null}
+      </section>
+
+      {dominantInsight ? (
+        <>
+          <section className="rounded-xl border border-border/70 p-4">
+            <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Strengths</h4>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+              {dominantInsight.strengths.map((item) => (
+                <li key={item}>{item}</li>
               ))}
             </ul>
-          ) : null}
-        </section>
+          </section>
 
-        <section className="rounded-xl border border-border/70 p-4">
-          <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Metadata</h4>
-          <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-            <li>Created: {formatDate(createdAt)}</li>
-            <li>Completed: {formatDate(completionDate)}</li>
-            <li>Response count: {records.length}</li>
-          </ul>
-          {externalSessionId ? (
-            <details className="mt-3">
-              <summary className="cursor-pointer text-xs text-muted-foreground">Technical details</summary>
-              <p className="mt-2 break-all text-xs text-muted-foreground">Session ID: {externalSessionId}</p>
-            </details>
-          ) : null}
-        </section>
-      </div>
+          <section className="rounded-xl border border-border/70 p-4">
+            <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Potential challenges</h4>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+              {dominantInsight.challenges.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </section>
 
-      {profileTraits.length > 0 ? (
-        <section className="rounded-xl border border-border/70 p-4">
-          <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Profile traits / dimensions</h4>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {profileTraits.map((item) => (
-              <div key={item.label} className="rounded-lg border border-border/60 bg-muted/20 p-2 text-sm">
-                <p className="font-medium">{item.label}</p>
-                <p className="text-xs text-muted-foreground">Observed {item.count} time{item.count === 1 ? "" : "s"}</p>
-              </div>
-            ))}
-          </div>
-        </section>
+          <section className="grid gap-3 md:grid-cols-2">
+            <div className="rounded-xl border border-border/70 p-4">
+              <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">How you communicate</h4>
+              <p className="mt-2 text-sm text-muted-foreground">{dominantInsight.communication}</p>
+            </div>
+            <div className="rounded-xl border border-border/70 p-4">
+              <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">How you work best</h4>
+              <p className="mt-2 text-sm text-muted-foreground">{dominantInsight.workStyle}</p>
+            </div>
+          </section>
+        </>
       ) : null}
+
+      <section className="rounded-xl border border-border/70 p-4">
+        <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Metadata</h4>
+        <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+          <li>Created: {formatDate(createdAt)}</li>
+          <li>Completed: {formatDate(completionDate)}</li>
+          <li>Response count: {records.length}</li>
+          <li>
+            DISC signals: D {dimensionCounts.D} · I {dimensionCounts.I} · S {dimensionCounts.S} · C {dimensionCounts.C}
+          </li>
+        </ul>
+        {externalSessionId ? (
+          <details className="mt-3">
+            <summary className="cursor-pointer text-xs text-muted-foreground">Technical details</summary>
+            <p className="mt-2 break-all text-xs text-muted-foreground">Session ID: {externalSessionId}</p>
+          </details>
+        ) : null}
+      </section>
 
       {dimensionSamples.length > 0 ? (
         <section className="rounded-xl border border-border/70 p-4">
-          <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Dimension sample</h4>
+          <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Profile traits / dimensions</h4>
           <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
             {dimensionSamples.map((item) => (
               <li key={`${item.dimension}:${item.value}`}>
@@ -197,13 +295,6 @@ export function DiscResultPresentation({
               </li>
             ))}
           </ul>
-        </section>
-      ) : null}
-
-      {interpretationText ? (
-        <section className="rounded-xl border border-border/70 p-4">
-          <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Interpretation</h4>
-          <p className="mt-2 text-sm text-muted-foreground">{interpretationText}</p>
         </section>
       ) : null}
     </div>
