@@ -18,7 +18,7 @@ type AdminEditorProps = {
   users: Array<{
     id: string;
     email: string | null;
-    role: "ADMIN" | "FAMILY" | "USER";
+    role: "ADMIN" | "USER";
     approvalStatus: "PENDING" | "APPROVED" | "REJECTED";
     createdAt: Date;
     loginActivities: Array<{
@@ -267,7 +267,7 @@ export function AdminEditor({ homeContent, professionalContent, users, currentAd
                     ) : null}
                   </td>
                   <td className="py-3 pr-3 text-xs text-muted-foreground">
-                    <p>Family: {user.approvalStatus === "APPROVED" && ["FAMILY", "ADMIN"].includes(user.role) ? "yes" : "no"}</p>
+                    <p>Family: {user.approvalStatus === "APPROVED" ? "yes" : "no"}</p>
                     <p className="mt-1">Investments: {user.approvalStatus === "APPROVED" && user.role === "ADMIN" ? "yes" : "no"}</p>
                   </td>
                   <td className="py-3">
@@ -276,7 +276,6 @@ export function AdminEditor({ homeContent, professionalContent, users, currentAd
                         <input type="hidden" name="userId" value={user.id} />
                         <select name="role" defaultValue={user.role} className="h-9 rounded-md border border-input bg-background px-3 text-sm">
                           <option value="USER">user</option>
-                          <option value="FAMILY">family</option>
                           <option value="ADMIN">admin</option>
                         </select>
                         <select

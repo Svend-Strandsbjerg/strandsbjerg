@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { AssessmentInviteStatus } from "@prisma/client";
 
 import { requireUser } from "@/lib/access";
+import { isCompanyRecruiter } from "@/lib/company-access";
 import { createUniqueAssessmentInviteToken } from "@/lib/disc-invites";
 import { prisma } from "@/lib/prisma";
 
@@ -18,18 +19,9 @@ export const initialCompanyInviteActionState: CompanyInviteActionState = {
 };
 
 async function requireCompanyRecruiter(userId: string, companyId: string) {
-  const membership = await prisma.companyMembership.findFirst({
-    where: {
-      userId,
-      companyId,
-      role: {
-        in: ["COMPANY_ADMIN", "COMPANY_RECRUITER"],
-      },
-    },
-    select: { id: true },
-  });
+  const canRecruitForCompany = await isCompanyRecruiter(userId, companyId);
 
-  if (!membership) {
+  if (!canRecruitForCompany) {
     throw new Error("Not authorized for this company");
   }
 }

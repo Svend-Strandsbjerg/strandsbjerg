@@ -17,7 +17,7 @@ import {
 type SearchParams = Record<string, string | string[] | undefined>;
 type SessionUser = {
   id: string;
-  role?: "ADMIN" | "FAMILY" | "USER";
+  role?: "ADMIN" | "USER";
   approvalStatus?: "PENDING" | "APPROVED" | "REJECTED";
 };
 

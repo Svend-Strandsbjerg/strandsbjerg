@@ -9,7 +9,7 @@ async function main() {
     create: {
       email: "family@example.com",
       name: "Family Demo User",
-      role: Role.FAMILY,
+      role: Role.USER,
       approvalStatus: ApprovalStatus.APPROVED,
     },
   });
