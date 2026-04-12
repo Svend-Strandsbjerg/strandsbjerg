@@ -1,0 +1,72 @@
+import { headers } from "next/headers";
+
+import { CompanyDiscAdmin } from "@/app/disc/company/company-disc-admin";
+import { requireUser } from "@/lib/access";
+import { prisma } from "@/lib/prisma";
+
+export const dynamic = "force-dynamic";
+
+function inferOrigin(hostHeader: string | null) {
+  if (!hostHeader) {
+    return "http://localhost:3000";
+  }
+
+  const protocol = hostHeader.includes("localhost") ? "http" : "https";
+  return `${protocol}://${hostHeader}`;
+}
+
+export default async function CompanyDiscPage() {
+  const user = await requireUser();
+  const requestHeaders = await headers();
+  const companies = await prisma.companyMembership.findMany({
+    where: {
+      userId: user.id,
+      role: {
+        in: ["COMPANY_ADMIN", "COMPANY_RECRUITER"],
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    select: {
+      company: {
+        select: {
+          id: true,
+          name: true,
+          invites: {
+            orderBy: { createdAt: "desc" },
+            take: 20,
+            select: {
+              id: true,
+              token: true,
+              candidateName: true,
+              candidateEmail: true,
+              status: true,
+              expiresAt: true,
+              createdAt: true,
+            },
+          },
+          assessments: {
+            where: { status: "SUBMITTED" },
+            orderBy: { submittedAt: "desc" },
+            take: 20,
+            select: {
+              id: true,
+              externalSessionId: true,
+              candidateName: true,
+              candidateEmail: true,
+              userId: true,
+              submittedAt: true,
+              createdAt: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  return (
+    <CompanyDiscAdmin
+      companies={companies.map((membership) => membership.company)}
+      origin={inferOrigin(requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host"))}
+    />
+  );
+}

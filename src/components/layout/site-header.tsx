@@ -26,6 +26,11 @@ export async function SiteHeader() {
               {item.label}
             </TopNavItemLink>
           ))}
+          {session?.user ? (
+            <TopNavItemLink href="/disc" activePathPrefix="/disc">
+              DISC
+            </TopNavItemLink>
+          ) : null}
           {session?.user ? <TopNavItemLink href="/account">My User</TopNavItemLink> : null}
           {canAccessFamily(session?.user) ? <TopNavItemLink href={FAMILY_PRIVATE_BASE_PATH}>Family</TopNavItemLink> : null}
           {canAccessInvestments(session?.user) ? <TopNavItemLink href={INVESTMENTS_PRIVATE_BASE_PATH}>Investments</TopNavItemLink> : null}

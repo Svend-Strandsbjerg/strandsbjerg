@@ -38,6 +38,23 @@ enum AuthMethod {
   OAUTH
 }
 
+enum CompanyRole {
+  COMPANY_ADMIN
+  COMPANY_RECRUITER
+}
+
+enum AssessmentInviteStatus {
+  ACTIVE
+  COMPLETED
+  INVALIDATED
+}
+
+enum DiscAssessmentStatus {
+  STARTED
+  SUBMITTED
+  FAILED
+}
+
 model User {
   id             String         @id @default(cuid())
   name           String?
@@ -56,10 +73,80 @@ model User {
   securities             Security[]              @relation("SecurityCreator")
   investmentTransactions InvestmentTransaction[] @relation("InvestmentTransactionCreator")
   loginActivities         LoginActivity[]
+  discAssessments         DiscAssessment[]
+  companyMemberships      CompanyMembership[]
+  createdAssessmentInvites AssessmentInvite[] @relation("InviteCreator")
 
   passwordChangedAt DateTime?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+}
+
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships CompanyMembership[]
+  invites     AssessmentInvite[]
+  assessments DiscAssessment[]
+}
+
+model CompanyMembership {
+  id        String      @id @default(cuid())
+  userId    String
+  companyId String
+  role      CompanyRole
+  createdAt DateTime    @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, companyId])
+  @@index([companyId])
+}
+
+model AssessmentInvite {
+  id              String                 @id @default(cuid())
+  token           String                 @unique
+  companyId       String
+  createdByUserId String
+  candidateName   String?
+  candidateEmail  String?
+  status          AssessmentInviteStatus @default(ACTIVE)
+  expiresAt       DateTime
+  createdAt       DateTime               @default(now())
+
+  company       Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdByUser User             @relation("InviteCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  assessments   DiscAssessment[]
+
+  @@index([companyId, status])
+  @@index([expiresAt])
+}
+
+model DiscAssessment {
+  id                  String               @id @default(cuid())
+  externalSessionId   String               @unique
+  assessmentVersionId String
+  userId              String?
+  inviteId            String?
+  companyId           String?
+  candidateName       String?
+  candidateEmail      String?
+  createdAt           DateTime             @default(now())
+  submittedAt         DateTime?
+  status              DiscAssessmentStatus @default(STARTED)
+  rawResponses        Json?
+
+  user    User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  invite  AssessmentInvite? @relation(fields: [inviteId], references: [id], onDelete: SetNull)
+  company Company?          @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([companyId, createdAt])
+  @@index([inviteId])
 }
 
 model Account {
