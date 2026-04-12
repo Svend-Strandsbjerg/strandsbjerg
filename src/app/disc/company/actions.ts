@@ -7,7 +7,7 @@ import { AssessmentInviteStatus } from "@prisma/client";
 import { requireUser } from "@/lib/access";
 import { isCompanyRecruiter } from "@/lib/company-access";
 import { sendDiscEmail } from "@/lib/disc-email";
-import { createUniqueAssessmentInviteToken } from "@/lib/disc-invites";
+import { createUniqueAssessmentInviteToken, getInviteAccessState } from "@/lib/disc-invites";
 import { buildResultLink, ensureAssessmentResultShare } from "@/lib/disc-result-share";
 import { prisma } from "@/lib/prisma";
 
@@ -174,5 +174,62 @@ export async function resendAssessmentResultEmail(
     return { status: "success", message: "Result email sent." };
   } catch {
     return { status: "error", message: "Could not send result email." };
+  }
+}
+
+export async function resendAssessmentInviteEmail(
+  _: CompanyInviteActionState,
+  formData: FormData,
+): Promise<CompanyInviteActionState> {
+  try {
+    const user = await requireUser();
+    const companyId = String(formData.get("companyId") ?? "").trim();
+    const inviteId = String(formData.get("inviteId") ?? "").trim();
+
+    if (!companyId || !inviteId) {
+      return { status: "error", message: "Invalid invite request." };
+    }
+
+    await requireCompanyRecruiter(user.id, companyId);
+
+    const invite = await prisma.assessmentInvite.findFirst({
+      where: {
+        id: inviteId,
+        companyId,
+      },
+      select: {
+        token: true,
+        candidateName: true,
+        candidateEmail: true,
+        status: true,
+        expiresAt: true,
+      },
+    });
+
+    if (!invite) {
+      return { status: "error", message: "Invite not found." };
+    }
+
+    if (!invite.candidateEmail) {
+      return { status: "error", message: "Candidate email is missing for this invite." };
+    }
+
+    const inviteState = getInviteAccessState(invite.status, invite.expiresAt);
+    if (inviteState !== "active") {
+      return { status: "error", message: "Only active invites can be re-sent." };
+    }
+
+    const origin = await inferOrigin();
+    const inviteLink = `${origin}/disc/invite/${invite.token}`;
+
+    await sendDiscEmail({
+      to: invite.candidateEmail,
+      subject: "Reminder: your DISC assessment invite",
+      text: `Hello${invite.candidateName ? ` ${invite.candidateName}` : ""},\n\nThis is a reminder to complete your DISC assessment.\n\nOpen your secure invite link:\n${inviteLink}\n\nThis link expires on ${invite.expiresAt.toISOString().slice(0, 10)}.`,
+    });
+
+    return { status: "success", message: "Invite email sent." };
+  } catch {
+    return { status: "error", message: "Could not resend invite email." };
   }
 }

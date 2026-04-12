@@ -6,11 +6,13 @@ import {
   createAssessmentInvite,
   initialCompanyInviteActionState,
   invalidateAssessmentInvite,
+  resendAssessmentInviteEmail,
   resendAssessmentResultEmail,
 } from "@/app/disc/company/actions";
 import { DiscResultPresentation } from "@/components/disc/disc-result-presentation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 type CompanyDiscAdminProps = {
   companies: Array<{
@@ -24,6 +26,13 @@ type CompanyDiscAdminProps = {
       status: "ACTIVE" | "COMPLETED" | "INVALIDATED";
       expiresAt: Date;
       createdAt: Date;
+      assessments: Array<{
+        id: string;
+        submittedAt: Date | null;
+        resultShare: {
+          token: string;
+        } | null;
+      }>;
     }>;
     assessments: Array<{
       id: string;
@@ -43,6 +52,8 @@ type CompanyDiscAdminProps = {
   }>;
   origin: string;
 };
+
+type CompanyFilterStatus = "all" | "pending" | "completed";
 
 function CopyLinkButton({ link }: { link: string }) {
   const [copied, setCopied] = useState(false);
@@ -66,10 +77,16 @@ function CopyLinkButton({ link }: { link: string }) {
 export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
   const [createState, createAction] = useActionState(createAssessmentInvite, initialCompanyInviteActionState);
   const [invalidateState, invalidateAction] = useActionState(invalidateAssessmentInvite, initialCompanyInviteActionState);
+  const [resendInviteState, resendInviteAction] = useActionState(resendAssessmentInviteEmail, initialCompanyInviteActionState);
   const [resendState, resendAction] = useActionState(resendAssessmentResultEmail, initialCompanyInviteActionState);
+  const [statusFilter, setStatusFilter] = useState<CompanyFilterStatus>("all");
   const infoState = useMemo(() => {
     if (resendState.status !== "idle") {
       return resendState;
+    }
+
+    if (resendInviteState.status !== "idle") {
+      return resendInviteState;
     }
 
     if (invalidateState.status !== "idle") {
@@ -77,13 +94,21 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
     }
 
     return createState;
-  }, [createState, invalidateState, resendState]);
+  }, [createState, invalidateState, resendInviteState, resendState]);
 
   return (
     <div className="space-y-6">
       <div className="rounded-3xl border border-border/80 bg-card p-6 shadow-sm">
         <h1 className="text-2xl font-semibold tracking-tight">Company DISC invites</h1>
         <p className="mt-2 text-sm text-muted-foreground">Create invite links, track candidates, and view completed assessments.</p>
+        <div className="mt-4 rounded-2xl border border-border/70 bg-background/40 p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Getting started</p>
+          <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
+            <li>Create invite</li>
+            <li>Send link</li>
+            <li>Review result</li>
+          </ol>
+        </div>
         {infoState.status !== "idle" ? (
           <p className={infoState.status === "success" ? "mt-2 text-sm text-emerald-700" : "mt-2 text-sm text-destructive"}>{infoState.message}</p>
         ) : null}
@@ -99,7 +124,7 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
         <section key={company.id} className="rounded-3xl border border-border/80 bg-card p-6 shadow-sm">
           <h2 className="text-xl font-semibold tracking-tight">{company.name}</h2>
 
-          <form action={createAction} className="mt-4 grid gap-3 md:grid-cols-4">
+          <form id={`create-invite-${company.id}`} action={createAction} className="mt-4 grid gap-3 md:grid-cols-4">
             <input type="hidden" name="companyId" value={company.id} />
             <Input name="candidateName" placeholder="Candidate name" />
             <Input name="candidateEmail" type="email" placeholder="Candidate email" />
@@ -113,42 +138,160 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
             </div>
           </form>
 
-          <div className="mt-6 space-y-3">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Invites</h3>
-            {company.invites.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No invites yet.</p>
-            ) : (
-              <div className="space-y-3">
-                {company.invites.map((invite) => {
-                  const link = `${origin}/disc/invite/${invite.token}`;
+          {(() => {
+            const now = Date.now();
+            const rows = company.invites.map((invite) => {
+              const latestAssessment = invite.assessments[0] ?? null;
+              const isCompleted = invite.status === "COMPLETED" || Boolean(latestAssessment);
+              const isExpired = !isCompleted && invite.expiresAt.getTime() <= now;
+              const mappedStatus = isCompleted ? "completed" : isExpired ? "expired" : "pending";
 
-                  return (
-                    <div key={invite.id} className="rounded-xl border border-border/80 p-3 text-sm">
-                      <p>
-                        {invite.candidateName ?? "Unnamed candidate"} · {invite.candidateEmail ?? "No email"}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Status: {invite.status.toLowerCase()} · Expires: {invite.expiresAt.toISOString().slice(0, 10)}
-                      </p>
-                      <div className="mt-2 flex items-center gap-2">
-                        <span className="max-w-[320px] truncate text-xs text-muted-foreground">{link}</span>
-                        <CopyLinkButton link={link} />
-                      </div>
-                      {invite.status === "ACTIVE" ? (
-                        <form action={invalidateAction} className="mt-2">
-                          <input type="hidden" name="inviteId" value={invite.id} />
-                          <input type="hidden" name="companyId" value={company.id} />
-                          <Button type="submit" variant="outline" className="h-8 text-xs">
-                            Invalidate
-                          </Button>
-                        </form>
-                      ) : null}
+              return {
+                ...invite,
+                mappedStatus,
+                latestAssessment,
+              };
+            });
+            const filteredRows = rows.filter((row) => (statusFilter === "all" ? true : row.mappedStatus === statusFilter));
+            const totalInvites = rows.length;
+            const pendingInvites = rows.filter((row) => row.mappedStatus === "pending").length;
+            const completedAssessments = rows.filter((row) => row.mappedStatus === "completed").length;
+
+            return (
+              <>
+                <div className="mt-6 grid gap-3 md:grid-cols-3">
+                  <div className="rounded-xl border border-border/80 bg-background/50 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Total invites</p>
+                    <p className="mt-1 text-2xl font-semibold">{totalInvites}</p>
+                  </div>
+                  <div className="rounded-xl border border-border/80 bg-background/50 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Pending invites</p>
+                    <p className="mt-1 text-2xl font-semibold">{pendingInvites}</p>
+                  </div>
+                  <div className="rounded-xl border border-border/80 bg-background/50 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Completed assessments</p>
+                    <p className="mt-1 text-2xl font-semibold">{completedAssessments}</p>
+                  </div>
+                </div>
+
+                <div className="mt-6 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Candidates</h3>
+                    <div className="inline-flex rounded-full border border-border/80 bg-background p-1">
+                      {(["all", "pending", "completed"] as CompanyFilterStatus[]).map((filterValue) => (
+                        <button
+                          key={filterValue}
+                          type="button"
+                          className={cn(
+                            "rounded-full px-3 py-1 text-xs font-medium capitalize transition",
+                            statusFilter === filterValue ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+                          )}
+                          onClick={() => setStatusFilter(filterValue)}
+                        >
+                          {filterValue}
+                        </button>
+                      ))}
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+                  </div>
+
+                  {rows.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-border/80 bg-background/40 p-6 text-center">
+                      <p className="text-base font-medium">No invites yet</p>
+                      <p className="mt-2 text-sm text-muted-foreground">Create DISC assessments for candidates and send them a link</p>
+                      <a
+                        href={`#create-invite-${company.id}`}
+                        className="mt-4 inline-flex items-center justify-center rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:opacity-90"
+                      >
+                        Create your first invite
+                      </a>
+                    </div>
+                  ) : filteredRows.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No candidates match the current status filter.</p>
+                  ) : (
+                    <div className="overflow-x-auto rounded-2xl border border-border/80">
+                      <table className="min-w-full divide-y divide-border/80 text-sm">
+                        <thead className="bg-muted/40 text-left text-xs uppercase tracking-[0.12em] text-muted-foreground">
+                          <tr>
+                            <th className="px-3 py-2 font-medium">Candidate</th>
+                            <th className="px-3 py-2 font-medium">Email</th>
+                            <th className="px-3 py-2 font-medium">Status</th>
+                            <th className="px-3 py-2 font-medium">Created</th>
+                            <th className="px-3 py-2 font-medium">Completed</th>
+                            <th className="px-3 py-2 font-medium">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/70">
+                          {filteredRows.map((row) => {
+                            const inviteLink = `${origin}/disc/invite/${row.token}`;
+                            const completionDate = row.latestAssessment?.submittedAt;
+                            const resultLink = row.latestAssessment?.resultShare?.token
+                              ? `${origin}/disc/result/${row.latestAssessment.resultShare.token}`
+                              : null;
+
+                            return (
+                              <tr key={row.id}>
+                                <td className="px-3 py-3">{row.candidateName ?? "Unnamed candidate"}</td>
+                                <td className="px-3 py-3 text-muted-foreground">{row.candidateEmail ?? "No email"}</td>
+                                <td className="px-3 py-3 capitalize">{row.mappedStatus}</td>
+                                <td className="px-3 py-3 text-muted-foreground">{row.createdAt.toISOString().slice(0, 10)}</td>
+                                <td className="px-3 py-3 text-muted-foreground">{completionDate ? completionDate.toISOString().slice(0, 10) : "—"}</td>
+                                <td className="px-3 py-3">
+                                  <div className="flex flex-wrap gap-2">
+                                    <CopyLinkButton link={inviteLink} />
+
+                                    {row.mappedStatus === "completed" ? (
+                                      row.latestAssessment ? (
+                                        <form action={resendAction}>
+                                          <input type="hidden" name="companyId" value={company.id} />
+                                          <input type="hidden" name="assessmentId" value={row.latestAssessment.id} />
+                                          <Button type="submit" variant="outline" className="h-8 text-xs">
+                                            Resend email
+                                          </Button>
+                                        </form>
+                                      ) : null
+                                    ) : (
+                                      <form action={resendInviteAction}>
+                                        <input type="hidden" name="companyId" value={company.id} />
+                                        <input type="hidden" name="inviteId" value={row.id} />
+                                        <Button type="submit" variant="outline" className="h-8 text-xs" disabled={!row.candidateEmail}>
+                                          Resend email
+                                        </Button>
+                                      </form>
+                                    )}
+
+                                    {resultLink ? (
+                                      <a
+                                        href={resultLink}
+                                        className="inline-flex h-8 items-center justify-center rounded-full border border-border bg-card px-3 text-xs font-medium hover:bg-muted"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                      >
+                                        Open result
+                                      </a>
+                                    ) : null}
+
+                                    {row.mappedStatus === "pending" ? (
+                                      <form action={invalidateAction}>
+                                        <input type="hidden" name="inviteId" value={row.id} />
+                                        <input type="hidden" name="companyId" value={company.id} />
+                                        <Button type="submit" variant="outline" className="h-8 text-xs">
+                                          Invalidate
+                                        </Button>
+                                      </form>
+                                    ) : null}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </>
+            );
+          })()}
 
           <div className="mt-6 space-y-3">
             <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Completed assessments</h3>
