@@ -96,6 +96,7 @@ The app fails fast if these are missing:
 For a full recruiter/candidate/manual acceptance checklist, see:
 
 - [`docs/staging-disc-manual-testing.md`](docs/staging-disc-manual-testing.md)
+- [`docs/beta-readiness-checklist.md`](docs/beta-readiness-checklist.md)
 
 This includes:
 

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getSharedDiscResultAccess } from "@/lib/disc-result-access";
 import { createDiscResultPdf } from "@/lib/disc-result-pdf";
 import { logServerEvent } from "@/lib/logger";
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,24 @@ export async function GET(_: Request, context: { params: Promise<{ token: string
   }
 
   try {
+    const firstPdfDownload = await prisma.assessmentResultShare.updateMany({
+      where: {
+        token,
+        firstPdfDownloadedAt: null,
+      },
+      data: {
+        firstPdfDownloadedAt: new Date(),
+      },
+    });
+
+    if (firstPdfDownload.count > 0) {
+      logServerEvent("info", "disc_beta_first_pdf_download", {
+        resultToken: token,
+        assessmentId: access.sharedResult.assessmentId,
+        companyId: access.sharedResult.assessment.companyId,
+      });
+    }
+
     const pdfBytes = createDiscResultPdf(access.sharedResult);
 
     return new NextResponse(pdfBytes, {

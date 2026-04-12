@@ -95,7 +95,7 @@ export async function createAssessmentInvite(
 
     const token = await createUniqueAssessmentInviteToken();
 
-    await prisma.assessmentInvite.create({
+    const createdInvite = await prisma.assessmentInvite.create({
       data: {
         token,
         companyId,
@@ -107,6 +107,18 @@ export async function createAssessmentInvite(
       },
     });
 
+    const totalCompanyInvites = await prisma.assessmentInvite.count({
+      where: { companyId },
+    });
+
+    if (totalCompanyInvites === 1) {
+      logServerEvent("info", "disc_beta_first_invite_created", {
+        companyId,
+        inviteId: createdInvite.id,
+        createdByUserId: user.id,
+      });
+    }
+
     if (sendInviteEmail && candidateEmail) {
       const origin = await inferOrigin();
       const inviteLink = `${origin}/disc/invite/${token}`;
@@ -116,6 +128,12 @@ export async function createAssessmentInvite(
           to: candidateEmail,
           subject: "Your DISC assessment invite",
           text: `Hello${candidateName ? ` ${candidateName}` : ""},\n\nYou have been invited to complete a DISC assessment.\n\nOpen your secure invite link:\n${inviteLink}\n\nThis link expires in ${expiresInDays} day(s).`,
+        });
+        logServerEvent("info", "disc_invite_email_sent", {
+          companyId,
+          inviteId: createdInvite.id,
+          candidateEmail,
+          sendType: "initial",
         });
       } catch (error) {
         logServerEvent("error", "disc_invite_email_send_failed", {
@@ -227,6 +245,12 @@ export async function resendAssessmentResultEmail(
       text: `Hello${assessment.candidateName ? ` ${assessment.candidateName}` : ""},\n\nYour DISC assessment result is available here:\n${resultLink}\n\nThis secure link gives view-only access to your completed result.`,
     });
 
+    logServerEvent("info", "disc_result_email_sent", {
+      companyId,
+      assessmentId,
+      candidateEmail: assessment.candidateEmail,
+    });
+
     return { status: "success", message: "Result email sent." };
   } catch (error) {
     logServerEvent("error", "disc_result_email_send_failed", {
@@ -298,6 +322,13 @@ export async function resendAssessmentInviteEmail(
       to: invite.candidateEmail,
       subject: "Reminder: your DISC assessment invite",
       text: `Hello${invite.candidateName ? ` ${invite.candidateName}` : ""},\n\nThis is a reminder to complete your DISC assessment.\n\nOpen your secure invite link:\n${inviteLink}\n\nThis link expires on ${invite.expiresAt.toISOString().slice(0, 10)}.`,
+    });
+
+    logServerEvent("info", "disc_invite_email_sent", {
+      companyId,
+      inviteId,
+      candidateEmail: invite.candidateEmail,
+      sendType: "resend",
     });
 
     return { status: "success", message: "Invite email sent." };

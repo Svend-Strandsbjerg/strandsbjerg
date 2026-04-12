@@ -112,12 +112,10 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
         <h1 className="text-2xl font-semibold tracking-tight">Company DISC invites</h1>
         <p className="mt-2 text-sm text-muted-foreground">Create invite links, track candidates, and view completed assessments.</p>
         <div className="mt-4 rounded-2xl border border-border/70 bg-background/40 p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Getting started</p>
-          <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
-            <li>Create invite</li>
-            <li>Send link</li>
-            <li>Review result</li>
-          </ol>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">How to use</p>
+          <p className="mt-2 text-sm text-muted-foreground">Create an invite and send it to your candidate.</p>
+          <p className="text-sm text-muted-foreground">They complete the DISC assessment from the secure link.</p>
+          <p className="text-sm text-muted-foreground">As soon as it is submitted, open the result and review or share it.</p>
         </div>
         {infoState.status !== "idle" ? (
           <div
@@ -129,7 +127,9 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
             <p className="font-medium">{infoState.message}</p>
             {infoState.status === "success" ? (
               <p className="mt-1 text-xs text-emerald-800/90">
-                Next step: share the invite link with your candidate. You&apos;ll see the status change to completed as soon as they submit.
+                {infoState.message.includes("email sent")
+                  ? "Confirmation: the email was sent. You can still copy the link below if needed."
+                  : "Next step: share the invite link with your candidate. You&apos;ll see a result-ready status after they submit."}
               </p>
             ) : null}
           </div>
@@ -289,6 +289,9 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
                                   ) : null}
                                   {isFreshCompletion ? (
                                     <p className="mt-1 text-[11px] normal-case font-medium text-emerald-700">New result ready for review.</p>
+                                  ) : null}
+                                  {row.mappedStatus === "completed" && !isFreshCompletion ? (
+                                    <p className="mt-1 text-[11px] normal-case text-emerald-700">Result ready.</p>
                                   ) : null}
                                 </td>
                                 <td className="px-3 py-3 text-muted-foreground">{row.createdAt.toISOString().slice(0, 10)}</td>
