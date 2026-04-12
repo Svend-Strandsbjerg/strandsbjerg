@@ -7,6 +7,7 @@ import {
   startInviteDiscAssessment,
   submitInviteDiscAssessment,
 } from "@/app/disc/invite/[token]/actions";
+import { DiscResultPresentation } from "@/components/disc/disc-result-presentation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -14,10 +15,16 @@ type InviteDiscClientProps = {
   token: string;
   candidateLabel: string;
   inviteState: "active" | "expired" | "invalidated" | "completed";
-  submittedResponses: unknown[] | null;
+  latestAssessment: {
+    status: "STARTED" | "SUBMITTED" | "FAILED";
+    createdAt: Date;
+    submittedAt: Date | null;
+    externalSessionId: string;
+    rawResponses: unknown;
+  } | null;
 };
 
-export function InviteDiscClient({ token, candidateLabel, inviteState, submittedResponses }: InviteDiscClientProps) {
+export function InviteDiscClient({ token, candidateLabel, inviteState, latestAssessment }: InviteDiscClientProps) {
   const [startState, startAction, starting] = useActionState(startInviteDiscAssessment, initialInviteDiscState);
   const [submitState, submitAction, submitting] = useActionState(submitInviteDiscAssessment, initialInviteDiscState);
 
@@ -25,11 +32,20 @@ export function InviteDiscClient({ token, candidateLabel, inviteState, submitted
   const hasStartedSession = Boolean(currentSessionId);
   const submissionSucceeded = submitState.status === "success";
 
-  if (inviteState === "completed" && submittedResponses) {
+  if (inviteState === "completed" && latestAssessment) {
     return (
       <div className="space-y-4">
         <p className="text-sm text-emerald-700">Assessment completed for {candidateLabel}.</p>
-        <pre className="overflow-auto rounded-xl border border-border/80 bg-muted/30 p-4 text-xs">{JSON.stringify(submittedResponses, null, 2)}</pre>
+        <DiscResultPresentation
+          title="Candidate DISC result"
+          status={latestAssessment.status}
+          createdAt={latestAssessment.createdAt}
+          submittedAt={latestAssessment.submittedAt}
+          rawResponses={latestAssessment.rawResponses}
+          externalSessionId={latestAssessment.externalSessionId}
+          identityLabel={candidateLabel}
+          emptyMessage="This invite was completed, but the result payload is incomplete."
+        />
       </div>
     );
   }

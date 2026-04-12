@@ -56,6 +56,8 @@ export default async function CompanyDiscPage() {
               userId: true,
               submittedAt: true,
               createdAt: true,
+              status: true,
+              rawResponses: true,
             },
           },
         },

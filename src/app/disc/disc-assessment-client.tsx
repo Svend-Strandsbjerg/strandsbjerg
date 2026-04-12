@@ -8,6 +8,7 @@ import {
   startDiscAssessment,
   submitDiscAssessmentResponses,
 } from "@/app/disc/actions";
+import { DiscResultPresentation } from "@/components/disc/disc-result-presentation";
 import { Button } from "@/components/ui/button";
 import { ContentContainer, PageIntro, PublicPageLayout, SectionBlock } from "@/components/ui/page-layout";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,6 +22,7 @@ type DiscAssessmentClientProps = {
     externalSessionId: string;
     createdAt: Date;
     submittedAt: Date | null;
+    rawResponses: unknown;
   }>;
 };
 
@@ -113,22 +115,25 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
           ) : null}
 
           {userId ? (
-            <div className="space-y-2 rounded-xl border border-border/80 bg-muted/20 p-4">
+            <div className="space-y-3 rounded-xl border border-border/80 bg-muted/20 p-4">
               <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Your assessment history</h3>
               {assessments.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No saved assessments yet.</p>
               ) : (
-                <ul className="space-y-2 text-sm">
-                  {assessments.map((assessment) => (
-                    <li key={assessment.id} className="rounded-lg border border-border/70 p-2">
-                      <p>Session: {assessment.externalSessionId}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Status: {assessment.status.toLowerCase()} · Created: {assessment.createdAt.toISOString().slice(0, 10)} · Submitted:{" "}
-                        {assessment.submittedAt ? assessment.submittedAt.toISOString().slice(0, 10) : "-"}
-                      </p>
-                    </li>
+                <div className="space-y-3">
+                  {assessments.map((assessment, index) => (
+                    <DiscResultPresentation
+                      key={assessment.id}
+                      title={`Assessment #${assessments.length - index}`}
+                      status={assessment.status}
+                      createdAt={assessment.createdAt}
+                      submittedAt={assessment.submittedAt}
+                      rawResponses={assessment.rawResponses}
+                      externalSessionId={assessment.externalSessionId}
+                      emptyMessage="This completed assessment does not include full result details yet."
+                    />
                   ))}
-                </ul>
+                </div>
               )}
             </div>
           ) : null}

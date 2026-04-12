@@ -40,7 +40,17 @@ export default async function InviteDiscPage({ params }: InviteDiscPageProps) {
         token={token}
         inviteState={inviteState}
         candidateLabel={invite.candidateName ?? invite.candidateEmail ?? "candidate"}
-        submittedResponses={latestAssessment?.status === "SUBMITTED" ? (latestAssessment.rawResponses as unknown[] | null) : null}
+        latestAssessment={
+          latestAssessment
+            ? {
+                status: latestAssessment.status,
+                createdAt: latestAssessment.createdAt,
+                submittedAt: latestAssessment.submittedAt,
+                externalSessionId: latestAssessment.externalSessionId,
+                rawResponses: latestAssessment.rawResponses,
+              }
+            : null
+        }
       />
     </div>
   );

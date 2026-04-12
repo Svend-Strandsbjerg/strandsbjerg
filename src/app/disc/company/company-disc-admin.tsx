@@ -7,6 +7,7 @@ import {
   initialCompanyInviteActionState,
   invalidateAssessmentInvite,
 } from "@/app/disc/company/actions";
+import { DiscResultPresentation } from "@/components/disc/disc-result-presentation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -31,6 +32,8 @@ type CompanyDiscAdminProps = {
       userId: string | null;
       submittedAt: Date | null;
       createdAt: Date;
+      status: "STARTED" | "SUBMITTED" | "FAILED";
+      rawResponses: unknown;
     }>;
   }>;
   origin: string;
@@ -131,15 +134,20 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
               <p className="text-sm text-muted-foreground">No completed assessments yet.</p>
             ) : (
               <div className="space-y-3">
-                {company.assessments.map((assessment) => (
-                  <div key={assessment.id} className="rounded-xl border border-border/80 p-3 text-sm">
-                    <p>
-                      {assessment.candidateName ?? "Candidate"} · {assessment.candidateEmail ?? (assessment.userId ? `User ${assessment.userId}` : "No identity")}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Session: {assessment.externalSessionId} · Submitted: {assessment.submittedAt?.toISOString() ?? "-"}
-                    </p>
-                  </div>
+                {company.assessments.map((assessment, index) => (
+                  <DiscResultPresentation
+                    key={assessment.id}
+                    title={`Company result #${company.assessments.length - index}`}
+                    status={assessment.status}
+                    createdAt={assessment.createdAt}
+                    submittedAt={assessment.submittedAt}
+                    rawResponses={assessment.rawResponses}
+                    externalSessionId={assessment.externalSessionId}
+                    identityLabel={
+                      assessment.candidateName ?? assessment.candidateEmail ?? (assessment.userId ? `User ${assessment.userId}` : "Candidate")
+                    }
+                    emptyMessage="This submitted assessment has no readable response payload yet."
+                  />
                 ))}
               </div>
             )}
