@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import { notFound } from "next/navigation";
 
 import { CompanyDiscAdmin } from "@/app/disc/company/company-disc-admin";
 import { requireUser } from "@/lib/access";
@@ -84,6 +85,10 @@ export default async function CompanyDiscPage() {
       },
     },
   });
+
+  if (companies.length === 0) {
+    notFound();
+  }
 
   return (
     <CompanyDiscAdmin

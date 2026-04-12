@@ -8,6 +8,8 @@ import { requireUser } from "@/lib/access";
 import { isCompanyRecruiter } from "@/lib/company-access";
 import { sendDiscEmail } from "@/lib/disc-email";
 import { createUniqueAssessmentInviteToken, getInviteAccessState } from "@/lib/disc-invites";
+import { logServerEvent } from "@/lib/logger";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { buildResultLink, ensureAssessmentResultShare } from "@/lib/disc-result-share";
 import { prisma } from "@/lib/prisma";
 
@@ -45,14 +47,24 @@ export async function createAssessmentInvite(
   _: CompanyInviteActionState,
   formData: FormData,
 ): Promise<CompanyInviteActionState> {
+  const user = await requireUser();
+  const companyId = String(formData.get("companyId") ?? "").trim();
+
+  if (!companyId) {
+    return { status: "error", message: "Missing company." };
+  }
+
+  const createRateLimit = enforceRateLimit({
+    key: `invite-create:${user.id}:${companyId}`,
+    limit: 5,
+    windowMs: 60_000,
+  });
+
+  if (!createRateLimit.ok) {
+    return { status: "error", message: "Too many invite creations. Please wait before trying again." };
+  }
+
   try {
-    const user = await requireUser();
-    const companyId = String(formData.get("companyId") ?? "").trim();
-
-    if (!companyId) {
-      return { status: "error", message: "Missing company." };
-    }
-
     await requireCompanyRecruiter(user.id, companyId);
 
     const candidateName = String(formData.get("candidateName") ?? "").trim() || null;
@@ -60,8 +72,25 @@ export async function createAssessmentInvite(
     const expiresInDaysRaw = Number(formData.get("expiresInDays") ?? 7);
     const expiresInDays = Number.isFinite(expiresInDaysRaw) ? Math.min(Math.max(expiresInDaysRaw, 1), 30) : 7;
     const sendInviteEmail = isChecked(formData.get("sendInviteEmail"));
+
     if (sendInviteEmail && !candidateEmail) {
       return { status: "error", message: "Candidate email is required when sending an invite email." };
+    }
+
+    if (candidateEmail) {
+      const existingActiveInvite = await prisma.assessmentInvite.findFirst({
+        where: {
+          companyId,
+          candidateEmail,
+          status: AssessmentInviteStatus.ACTIVE,
+          expiresAt: { gt: new Date() },
+        },
+        select: { id: true },
+      });
+
+      if (existingActiveInvite) {
+        return { status: "error", message: "An active invite already exists for this candidate email." };
+      }
     }
 
     const token = await createUniqueAssessmentInviteToken();
@@ -82,17 +111,33 @@ export async function createAssessmentInvite(
       const origin = await inferOrigin();
       const inviteLink = `${origin}/disc/invite/${token}`;
 
-      await sendDiscEmail({
-        to: candidateEmail,
-        subject: "Your DISC assessment invite",
-        text: `Hello${candidateName ? ` ${candidateName}` : ""},\n\nYou have been invited to complete a DISC assessment.\n\nOpen your secure invite link:\n${inviteLink}\n\nThis link expires in ${expiresInDays} day(s).`,
-      });
+      try {
+        await sendDiscEmail({
+          to: candidateEmail,
+          subject: "Your DISC assessment invite",
+          text: `Hello${candidateName ? ` ${candidateName}` : ""},\n\nYou have been invited to complete a DISC assessment.\n\nOpen your secure invite link:\n${inviteLink}\n\nThis link expires in ${expiresInDays} day(s).`,
+        });
+      } catch (error) {
+        logServerEvent("error", "disc_invite_email_send_failed", {
+          companyId,
+          userId: user.id,
+          inviteType: "initial",
+          error,
+        });
+
+        return { status: "error", message: "Invite created, but email delivery failed. You can copy and send the link manually." };
+      }
     }
 
     revalidatePath("/disc/company");
 
     return { status: "success", message: sendInviteEmail ? "Invite created and email sent." : "Invite created." };
-  } catch {
+  } catch (error) {
+    logServerEvent("error", "disc_invite_create_failed", {
+      companyId,
+      userId: user.id,
+      error,
+    });
     return { status: "error", message: "Could not create invite." };
   }
 }
@@ -120,7 +165,8 @@ export async function invalidateAssessmentInvite(
     revalidatePath("/disc/company");
 
     return { status: "success", message: "Invite invalidated." };
-  } catch {
+  } catch (error) {
+    logServerEvent("error", "disc_invite_invalidate_failed", { error });
     return { status: "error", message: "Could not invalidate invite." };
   }
 }
@@ -129,15 +175,25 @@ export async function resendAssessmentResultEmail(
   _: CompanyInviteActionState,
   formData: FormData,
 ): Promise<CompanyInviteActionState> {
+  const user = await requireUser();
+  const companyId = String(formData.get("companyId") ?? "").trim();
+  const assessmentId = String(formData.get("assessmentId") ?? "").trim();
+
+  if (!companyId || !assessmentId) {
+    return { status: "error", message: "Invalid assessment request." };
+  }
+
+  const rateLimit = enforceRateLimit({
+    key: `result-email:${user.id}:${assessmentId}`,
+    limit: 2,
+    windowMs: 60_000,
+  });
+
+  if (!rateLimit.ok) {
+    return { status: "error", message: "Please wait before resending this result email again." };
+  }
+
   try {
-    const user = await requireUser();
-    const companyId = String(formData.get("companyId") ?? "").trim();
-    const assessmentId = String(formData.get("assessmentId") ?? "").trim();
-
-    if (!companyId || !assessmentId) {
-      return { status: "error", message: "Invalid assessment request." };
-    }
-
     await requireCompanyRecruiter(user.id, companyId);
 
     const assessment = await prisma.discAssessment.findFirst({
@@ -172,7 +228,13 @@ export async function resendAssessmentResultEmail(
     });
 
     return { status: "success", message: "Result email sent." };
-  } catch {
+  } catch (error) {
+    logServerEvent("error", "disc_result_email_send_failed", {
+      companyId,
+      assessmentId,
+      userId: user.id,
+      error,
+    });
     return { status: "error", message: "Could not send result email." };
   }
 }
@@ -181,15 +243,25 @@ export async function resendAssessmentInviteEmail(
   _: CompanyInviteActionState,
   formData: FormData,
 ): Promise<CompanyInviteActionState> {
+  const user = await requireUser();
+  const companyId = String(formData.get("companyId") ?? "").trim();
+  const inviteId = String(formData.get("inviteId") ?? "").trim();
+
+  if (!companyId || !inviteId) {
+    return { status: "error", message: "Invalid invite request." };
+  }
+
+  const rateLimit = enforceRateLimit({
+    key: `invite-email:${user.id}:${inviteId}`,
+    limit: 2,
+    windowMs: 60_000,
+  });
+
+  if (!rateLimit.ok) {
+    return { status: "error", message: "Please wait before sending this invite email again." };
+  }
+
   try {
-    const user = await requireUser();
-    const companyId = String(formData.get("companyId") ?? "").trim();
-    const inviteId = String(formData.get("inviteId") ?? "").trim();
-
-    if (!companyId || !inviteId) {
-      return { status: "error", message: "Invalid invite request." };
-    }
-
     await requireCompanyRecruiter(user.id, companyId);
 
     const invite = await prisma.assessmentInvite.findFirst({
@@ -229,7 +301,14 @@ export async function resendAssessmentInviteEmail(
     });
 
     return { status: "success", message: "Invite email sent." };
-  } catch {
+  } catch (error) {
+    logServerEvent("error", "disc_invite_email_send_failed", {
+      companyId,
+      inviteId,
+      userId: user.id,
+      inviteType: "resend",
+      error,
+    });
     return { status: "error", message: "Could not resend invite email." };
   }
 }

@@ -303,7 +303,7 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
                                           <input type="hidden" name="companyId" value={company.id} />
                                           <input type="hidden" name="assessmentId" value={row.latestAssessment.id} />
                                           <Button type="submit" variant="outline" className="h-8 text-xs">
-                                            Resend email
+                                            Resend result email
                                           </Button>
                                         </form>
                                       ) : null
@@ -312,7 +312,7 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
                                         <input type="hidden" name="companyId" value={company.id} />
                                         <input type="hidden" name="inviteId" value={row.id} />
                                         <Button type="submit" variant="outline" className="h-8 text-xs" disabled={!row.candidateEmail}>
-                                          Resend email
+                                          Resend invite email
                                         </Button>
                                       </form>
                                     )}
@@ -395,7 +395,7 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
                               <input type="hidden" name="companyId" value={company.id} />
                               <input type="hidden" name="assessmentId" value={assessment.id} />
                               <Button type="submit" variant="outline" className="h-8 text-xs">
-                                Send email
+                                Send result email
                               </Button>
                             </form>
                           </>

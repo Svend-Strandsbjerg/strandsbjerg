@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { InviteDiscClient } from "@/app/disc/invite/[token]/invite-disc-client";
 import { getInviteAccessState } from "@/lib/disc-invites";
+import { logServerEvent } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 
 type InviteDiscPageProps = {
@@ -52,6 +53,20 @@ export default async function InviteDiscPage({ params }: InviteDiscPageProps) {
   const latestAssessment = invite.assessments[0] ?? null;
   const inviteState = getInviteAccessState(invite.status, invite.expiresAt);
   const origin = inferOrigin(requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host"));
+
+  if (inviteState === "invalidated" || inviteState === "completed") {
+    logServerEvent("warn", "disc_invite_route_blocked", { inviteToken: token, state: inviteState });
+    notFound();
+  }
+
+  if (inviteState === "expired") {
+    return (
+      <div className="mx-auto max-w-2xl space-y-4 rounded-3xl border border-border/80 bg-card p-6 shadow-sm sm:p-8">
+        <h1 className="text-2xl font-semibold tracking-tight">DISC invite expired</h1>
+        <p className="text-sm text-muted-foreground">This invite link has expired. Please ask the recruiter to send a new invite.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 rounded-3xl border border-border/80 bg-card p-6 shadow-sm sm:p-8">

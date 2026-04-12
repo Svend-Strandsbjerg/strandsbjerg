@@ -1,7 +1,15 @@
+import { logServerEvent } from "@/lib/logger";
+
 const RESEND_API_URL = "https://api.resend.com/emails";
 
 function getFromEmail() {
-  return process.env.DISC_EMAIL_FROM || process.env.RESEND_FROM_EMAIL || "no-reply@example.com";
+  const from = process.env.DISC_EMAIL_FROM || process.env.RESEND_FROM_EMAIL;
+
+  if (!from) {
+    throw new Error("Missing DISC_EMAIL_FROM or RESEND_FROM_EMAIL for DISC email delivery.");
+  }
+
+  return from;
 }
 
 export async function sendDiscEmail(params: {
@@ -31,6 +39,11 @@ export async function sendDiscEmail(params: {
 
   if (!response.ok) {
     const errorBody = await response.text();
-    throw new Error(`Email delivery failed with status ${response.status}: ${errorBody.slice(0, 200)}`);
+    logServerEvent("error", "disc_email_delivery_failed", {
+      status: response.status,
+      toDomain: params.to.split("@")[1] ?? "unknown",
+      errorSnippet: errorBody.slice(0, 120),
+    });
+    throw new Error(`Email delivery failed with status ${response.status}`);
   }
 }
