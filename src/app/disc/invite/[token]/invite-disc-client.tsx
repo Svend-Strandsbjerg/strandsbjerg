@@ -1,12 +1,14 @@
 "use client";
 
-import { useActionState, useMemo } from "react";
+import Link from "next/link";
+import { useActionState, useMemo, useState } from "react";
 
 import {
   initialInviteDiscState,
   startInviteDiscAssessment,
   submitInviteDiscAssessment,
 } from "@/app/disc/invite/[token]/actions";
+import { DiscResultPresentation } from "@/components/disc/disc-result-presentation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -14,10 +16,37 @@ type InviteDiscClientProps = {
   token: string;
   candidateLabel: string;
   inviteState: "active" | "expired" | "invalidated" | "completed";
-  submittedResponses: unknown[] | null;
+  latestAssessment: {
+    id: string;
+    status: "STARTED" | "SUBMITTED" | "FAILED";
+    createdAt: Date;
+    submittedAt: Date | null;
+    externalSessionId: string;
+    rawResponses: unknown;
+    resultLink: string | null;
+  } | null;
 };
 
-export function InviteDiscClient({ token, candidateLabel, inviteState, submittedResponses }: InviteDiscClientProps) {
+function CopyResultLinkButton({ resultLink }: { resultLink: string }) {
+  const [copied, setCopied] = useState(false);
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      className="h-8 text-xs"
+      onClick={async () => {
+        await navigator.clipboard.writeText(resultLink);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      }}
+    >
+      {copied ? "Copied" : "Copy result link"}
+    </Button>
+  );
+}
+
+export function InviteDiscClient({ token, candidateLabel, inviteState, latestAssessment }: InviteDiscClientProps) {
   const [startState, startAction, starting] = useActionState(startInviteDiscAssessment, initialInviteDiscState);
   const [submitState, submitAction, submitting] = useActionState(submitInviteDiscAssessment, initialInviteDiscState);
 
@@ -25,11 +54,31 @@ export function InviteDiscClient({ token, candidateLabel, inviteState, submitted
   const hasStartedSession = Boolean(currentSessionId);
   const submissionSucceeded = submitState.status === "success";
 
-  if (inviteState === "completed" && submittedResponses) {
+  if (inviteState === "completed" && latestAssessment) {
     return (
       <div className="space-y-4">
         <p className="text-sm text-emerald-700">Assessment completed for {candidateLabel}.</p>
-        <pre className="overflow-auto rounded-xl border border-border/80 bg-muted/30 p-4 text-xs">{JSON.stringify(submittedResponses, null, 2)}</pre>
+        <DiscResultPresentation
+          title="Candidate DISC result"
+          status={latestAssessment.status}
+          createdAt={latestAssessment.createdAt}
+          submittedAt={latestAssessment.submittedAt}
+          rawResponses={latestAssessment.rawResponses}
+          externalSessionId={latestAssessment.externalSessionId}
+          identityLabel={candidateLabel}
+          emptyMessage="This invite was completed, but the result payload is incomplete."
+        />
+
+        {latestAssessment.resultLink ? (
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/70 bg-muted/20 p-3">
+            <CopyResultLinkButton resultLink={latestAssessment.resultLink} />
+            <Button asChild variant="outline" className="h-8 text-xs">
+              <Link href={latestAssessment.resultLink}>Open shared result</Link>
+            </Button>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">A permanent result link will appear once processing completes.</p>
+        )}
       </div>
     );
   }

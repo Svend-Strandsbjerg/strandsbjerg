@@ -25,6 +25,7 @@ export default async function DiscAssessmentPage() {
       externalSessionId: true,
       createdAt: true,
       submittedAt: true,
+      rawResponses: true,
     },
   });
 
