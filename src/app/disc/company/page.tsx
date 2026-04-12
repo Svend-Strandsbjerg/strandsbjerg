@@ -33,7 +33,7 @@ export default async function CompanyDiscPage() {
           name: true,
           invites: {
             orderBy: { createdAt: "desc" },
-            take: 20,
+            take: 100,
             select: {
               id: true,
               token: true,
@@ -42,6 +42,20 @@ export default async function CompanyDiscPage() {
               status: true,
               expiresAt: true,
               createdAt: true,
+              assessments: {
+                where: { status: "SUBMITTED" },
+                orderBy: { submittedAt: "desc" },
+                take: 1,
+                select: {
+                  id: true,
+                  submittedAt: true,
+                  resultShare: {
+                    select: {
+                      token: true,
+                    },
+                  },
+                },
+              },
             },
           },
           assessments: {
