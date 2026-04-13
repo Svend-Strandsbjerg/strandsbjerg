@@ -127,7 +127,7 @@ This includes:
 
 ## Data model overview
 
-- `User` with `role` (`ADMIN`/`FAMILY`) for future role-based access.
+- `User` with global `role` (`ADMIN`/`USER`) for platform access control.
 - `FamilyEvent` created by a user.
 - `EventDateOption` entries per event.
 - `Vote` mapping users to one or more date options.
