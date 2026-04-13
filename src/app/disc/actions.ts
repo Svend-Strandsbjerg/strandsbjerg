@@ -2,6 +2,7 @@
 
 import { cookies } from "next/headers";
 
+import type { DiscFlowState } from "@/app/disc/action-state";
 import { auth } from "@/lib/auth";
 import { createDiscAssessmentRecord, markDiscAssessmentSubmitted } from "@/lib/disc-assessment";
 import { DiscEngineError, createDiscSession, submitDiscResponses, validateDiscResponses } from "@/lib/disc-engine";
@@ -10,18 +11,6 @@ import { enforceRateLimit } from "@/lib/rate-limit";
 
 const DISC_SESSION_COOKIE = "disc_session_id";
 const DISC_SUBMITTED_COOKIE = "disc_submitted_session_id";
-
-export type DiscFlowState = {
-  status: "idle" | "success" | "error";
-  message: string;
-  sessionId: string;
-};
-
-export const initialDiscFlowState: DiscFlowState = {
-  status: "idle",
-  message: "",
-  sessionId: "",
-};
 
 function toErrorMessage(error: unknown, fallback: string) {
   if (error instanceof DiscEngineError) {
