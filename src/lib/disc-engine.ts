@@ -122,6 +122,48 @@ async function discEngineRequest<TResponse>(path: string, payload: unknown): Pro
   return parsedBody as TResponse;
 }
 
+function readStringKey(record: Record<string, unknown>, key: string): string | null {
+  const value = record[key];
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+function extractSessionIdFromCreateSessionResponse(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const root = payload as Record<string, unknown>;
+  const directSessionId = readStringKey(root, "sessionId") ?? readStringKey(root, "session_id");
+  if (directSessionId) {
+    return directSessionId;
+  }
+
+  const directId = readStringKey(root, "id");
+  if (directId) {
+    return directId;
+  }
+
+  const data = root.data;
+  if (data && typeof data === "object") {
+    const dataRecord = data as Record<string, unknown>;
+    const nestedSessionId = readStringKey(dataRecord, "sessionId") ?? readStringKey(dataRecord, "session_id") ?? readStringKey(dataRecord, "id");
+    if (nestedSessionId) {
+      return nestedSessionId;
+    }
+  }
+
+  const session = root.session;
+  if (session && typeof session === "object") {
+    const sessionRecord = session as Record<string, unknown>;
+    const nestedSessionId = readStringKey(sessionRecord, "sessionId") ?? readStringKey(sessionRecord, "session_id") ?? readStringKey(sessionRecord, "id");
+    if (nestedSessionId) {
+      return nestedSessionId;
+    }
+  }
+
+  return null;
+}
+
 export async function createDiscSession(): Promise<CreateDiscSessionResponse> {
   const assessmentVersionId = getRequiredEnv("DISC_ENGINE_ASSESSMENT_VERSION_ID");
 
@@ -132,16 +174,36 @@ export async function createDiscSession(): Promise<CreateDiscSessionResponse> {
     },
   };
 
-  const result = await discEngineRequest<CreateDiscSessionResponse>("/sessions", payload);
+  const result = await discEngineRequest<unknown>("/sessions", payload);
+  const sessionId = extractSessionIdFromCreateSessionResponse(result);
 
-  if (!result || typeof result.sessionId !== "string" || result.sessionId.length === 0) {
+  if (!sessionId) {
+    const responseKeys = result && typeof result === "object" ? Object.keys(result as Record<string, unknown>).slice(0, 15) : [];
+    const hasDataObject =
+      Boolean(result) && typeof result === "object" && "data" in (result as Record<string, unknown>) && typeof (result as Record<string, unknown>).data === "object";
+    const hasSessionObject =
+      Boolean(result) &&
+      typeof result === "object" &&
+      "session" in (result as Record<string, unknown>) &&
+      typeof (result as Record<string, unknown>).session === "object";
+
     logServerEvent("error", "disc_engine_malformed_session_response", {
       hasResult: Boolean(result),
+      responseKeys,
+      hasDataObject,
+      hasSessionObject,
     });
     throw new DiscEngineError("disc-engine /sessions returned an invalid payload");
   }
 
-  return result;
+  if (!result || typeof result !== "object") {
+    return { sessionId };
+  }
+
+  return {
+    ...(result as Record<string, unknown>),
+    sessionId,
+  };
 }
 
 export async function submitDiscResponses(input: SubmitDiscResponsesRequest): Promise<SubmitDiscResponsesResponse> {
