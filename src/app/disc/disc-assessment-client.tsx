@@ -4,10 +4,10 @@ import Link from "next/link";
 import { useActionState, useMemo } from "react";
 
 import {
-  initialDiscFlowState,
   startDiscAssessment,
   submitDiscAssessmentResponses,
 } from "@/app/disc/actions";
+import { initialDiscFlowState } from "@/app/disc/action-state";
 import { DiscResultPresentation } from "@/components/disc/disc-result-presentation";
 import { Button } from "@/components/ui/button";
 import { ContentContainer, PageIntro, PublicPageLayout, SectionBlock } from "@/components/ui/page-layout";
