@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import type { DiscFlowState } from "@/app/disc/action-state";
 import { auth } from "@/lib/auth";
 import { createDiscAssessmentRecord, markDiscAssessmentSubmitted } from "@/lib/disc-assessment";
-import { DiscEngineError, createDiscSession, submitDiscResponses, validateDiscResponses } from "@/lib/disc-engine";
+import { DiscEngineError, createDiscSession, getDiscSessionQuestions, submitDiscResponses, validateDiscResponses } from "@/lib/disc-engine";
 import { logServerEvent } from "@/lib/logger";
 import { enforceRateLimit } from "@/lib/rate-limit";
 
@@ -28,12 +28,23 @@ export async function startDiscAssessment(_: DiscFlowState): Promise<DiscFlowSta
   const submittedSessionId = cookieStore.get(DISC_SUBMITTED_COOKIE)?.value;
 
   if (existingSessionId && existingSessionId !== submittedSessionId) {
-    logServerEvent("info", "disc_flow_session_reused", { userId, sessionId: existingSessionId });
-    return {
-      status: "success",
-      message: "Existing DISC session restored.",
-      sessionId: existingSessionId,
-    };
+    try {
+      const questions = await getDiscSessionQuestions(existingSessionId);
+      logServerEvent("info", "disc_flow_session_reused", { userId, sessionId: existingSessionId, questionCount: questions.length });
+      return {
+        status: "success",
+        message: "Existing DISC session restored.",
+        sessionId: existingSessionId,
+        questions,
+      };
+    } catch (error) {
+      return {
+        status: "error",
+        message: toErrorMessage(error, "Existing session was found, but its questions could not be loaded."),
+        sessionId: existingSessionId,
+        questions: [],
+      };
+    }
   }
 
   const rateLimit = enforceRateLimit({ key: `disc-start:${userId}`, limit: 6, windowMs: 60_000 });
@@ -42,11 +53,13 @@ export async function startDiscAssessment(_: DiscFlowState): Promise<DiscFlowSta
       status: "error",
       message: "Too many start attempts. Please wait a minute and try again.",
       sessionId: "",
+      questions: [],
     };
   }
 
   try {
     const createdSession = await createDiscSession();
+    const questions = await getDiscSessionQuestions(createdSession.sessionId, createdSession);
     await createDiscAssessmentRecord({
       externalSessionId: createdSession.sessionId,
       userId: session?.user?.id ?? null,
@@ -67,6 +80,7 @@ export async function startDiscAssessment(_: DiscFlowState): Promise<DiscFlowSta
       status: "success",
       message: "DISC session created.",
       sessionId: createdSession.sessionId,
+      questions,
     };
   } catch (error) {
     logServerEvent("error", "disc_flow_session_create_failed", { userId, error });
@@ -75,6 +89,7 @@ export async function startDiscAssessment(_: DiscFlowState): Promise<DiscFlowSta
       status: "error",
       message: toErrorMessage(error, "Unable to start DISC session right now."),
       sessionId: "",
+      questions: [],
     };
   }
 }
@@ -95,6 +110,7 @@ export async function submitDiscAssessmentResponses(_: DiscFlowState, formData: 
       status: "error",
       message: "Session was not found. Please start the DISC session again.",
       sessionId: "",
+      questions: [],
     };
   }
 
@@ -103,6 +119,7 @@ export async function submitDiscAssessmentResponses(_: DiscFlowState, formData: 
       status: "success",
       message: "Responses already submitted for this session.",
       sessionId,
+      questions: [],
     };
   }
 
@@ -112,6 +129,7 @@ export async function submitDiscAssessmentResponses(_: DiscFlowState, formData: 
       status: "error",
       message: "Session mismatch detected. Please restart the DISC session.",
       sessionId: "",
+      questions: [],
     };
   }
 
@@ -121,6 +139,7 @@ export async function submitDiscAssessmentResponses(_: DiscFlowState, formData: 
       status: "error",
       message: "Too many submit attempts. Please wait before trying again.",
       sessionId,
+      questions: [],
     };
   }
 
@@ -132,6 +151,7 @@ export async function submitDiscAssessmentResponses(_: DiscFlowState, formData: 
       status: "error",
       message: "Responses must be valid JSON.",
       sessionId,
+      questions: [],
     };
   }
 
@@ -143,6 +163,7 @@ export async function submitDiscAssessmentResponses(_: DiscFlowState, formData: 
       status: "error",
       message: toErrorMessage(error, "Responses are invalid."),
       sessionId,
+      questions: [],
     };
   }
 
@@ -170,6 +191,7 @@ export async function submitDiscAssessmentResponses(_: DiscFlowState, formData: 
       status: "success",
       message: "Responses submitted successfully.",
       sessionId,
+      questions: [],
     };
   } catch (error) {
     logServerEvent("error", "disc_flow_responses_submit_failed", { userId, sessionId, error });
@@ -178,6 +200,7 @@ export async function submitDiscAssessmentResponses(_: DiscFlowState, formData: 
       status: "error",
       message: toErrorMessage(error, "Unable to submit responses right now."),
       sessionId,
+      questions: [],
     };
   }
 }
