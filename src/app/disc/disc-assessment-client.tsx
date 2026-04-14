@@ -70,11 +70,12 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
   const [isStartModalOpen, setIsStartModalOpen] = useState(false);
   const [isTransitioningQuestion, setIsTransitioningQuestion] = useState(false);
   const [isCompletingAssessment, setIsCompletingAssessment] = useState(false);
+  const [activeSessionId, setActiveSessionId] = useState("");
   const submitFormRef = useRef<HTMLFormElement>(null);
 
   const currentSessionId = useMemo(() => submitState.sessionId || startState.sessionId, [startState.sessionId, submitState.sessionId]);
   const questions = startState.questions;
-  const hasStartedSession = Boolean(currentSessionId);
+  const hasStartedSession = Boolean(activeSessionId);
   const hasQuestions = questions.length > 0;
   const activeQuestion = hasQuestions ? questions[Math.min(activeQuestionIndex, questions.length - 1)] : null;
   const [isMobileTimelineOpen, setIsMobileTimelineOpen] = useState(false);
@@ -136,6 +137,7 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
 
   useEffect(() => {
     if (startState.status === "success" && startState.sessionId && startState.questions.length > 0) {
+      setActiveSessionId(startState.sessionId);
       setIsAssessmentModalOpen(true);
       setActiveQuestionIndex(0);
       setHasEnteredFinalOverview(false);
@@ -146,6 +148,7 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
 
   useEffect(() => {
     if (submitState.status === "success") {
+      setActiveSessionId("");
       setIsCompletingAssessment(false);
       setIsAssessmentModalOpen(false);
       setHasEnteredFinalOverview(false);
@@ -255,7 +258,7 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
               <p className="text-sm text-muted-foreground">Loading assessment questions...</p>
             ) : null}
 
-            {!hasStartedSession && userId ? (
+            {userId ? (
               <div className="space-y-3 rounded-xl border border-border/80 bg-muted/20 p-4">
                 <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Your assessment history</h3>
                 {assessments.length === 0 ? (

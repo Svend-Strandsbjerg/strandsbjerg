@@ -1,4 +1,5 @@
-import { buildDiscResultViewModel } from "@/lib/disc-result-insights";
+import { buildDiscResultViewModel, deriveDiscPlacement } from "@/lib/disc-result-insights";
+import { cn } from "@/lib/utils";
 
 type DiscResultPresentationProps = {
   title: string;
@@ -13,13 +14,6 @@ type DiscResultPresentationProps = {
   footerNote?: string;
   pdfHref?: string;
 };
-
-const DISC_DIMENSIONS = [
-  { key: "D", label: "Dominance", color: "bg-red-500", lightColor: "bg-red-100", textColor: "text-red-900" },
-  { key: "I", label: "Influence", color: "bg-yellow-400", lightColor: "bg-yellow-100", textColor: "text-yellow-900" },
-  { key: "S", label: "Steadiness", color: "bg-green-500", lightColor: "bg-green-100", textColor: "text-green-900" },
-  { key: "C", label: "Conscientiousness", color: "bg-blue-500", lightColor: "bg-blue-100", textColor: "text-blue-900" },
-] as const;
 
 function formatDate(value: Date | null) {
   if (!value) {
@@ -57,6 +51,45 @@ function formatDimensionValue(value: number | null) {
   return Number.isInteger(value) ? `${value}` : value.toFixed(2);
 }
 
+function formatPercent(value: number) {
+  return `${Math.round(((value + 1) / 2) * 100)}%`;
+}
+
+function DiscSquare({ x, y }: { x: number; y: number }) {
+  return (
+    <div className="mx-auto w-full max-w-[25rem]">
+      <div className="relative aspect-square overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm">
+        <div className="absolute inset-0 grid grid-cols-2 grid-rows-2">
+          <div className="border-b border-r border-border/60 bg-red-500/20 p-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-red-900">D</div>
+          <div className="border-b border-border/60 bg-yellow-400/30 p-2 text-right text-[11px] font-semibold uppercase tracking-[0.12em] text-yellow-900">I</div>
+          <div className="border-r border-border/60 bg-blue-500/20 p-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-900">C</div>
+          <div className="bg-green-500/20 p-2 text-right text-[11px] font-semibold uppercase tracking-[0.12em] text-green-900">S</div>
+        </div>
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-foreground/25" />
+          <div className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-foreground/25" />
+        </div>
+        <div
+          className={cn(
+            "absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-slate-950 shadow-[0_0_0_3px_rgba(15,23,42,0.25)]",
+            "dark:border-slate-100 dark:bg-slate-50 dark:shadow-[0_0_0_3px_rgba(248,250,252,0.35)]",
+          )}
+          style={{ left: formatPercent(x), top: formatPercent(-y) }}
+          aria-label="DISC placement marker"
+        />
+      </div>
+      <div className="mt-2 flex items-center justify-between text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+        <span>Reserveret</span>
+        <span>Udadvendt</span>
+      </div>
+      <div className="mt-1 flex items-center justify-between text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+        <span>Struktureret</span>
+        <span>Handlingsorienteret</span>
+      </div>
+    </div>
+  );
+}
+
 export function DiscResultPresentation({
   title,
   status,
@@ -71,6 +104,7 @@ export function DiscResultPresentation({
   pdfHref,
 }: DiscResultPresentationProps) {
   const viewModel = buildDiscResultViewModel(rawResponses);
+  const placement = deriveDiscPlacement(viewModel.dimensionScores);
   const completionDate = submittedAt ?? (status === "SUBMITTED" ? createdAt : null);
   const qualityIndicatorEntries = Object.entries(viewModel.qualityIndicators);
 
@@ -122,7 +156,15 @@ export function DiscResultPresentation({
       </div>
 
       <section className="rounded-xl border border-border/70 p-4">
-        <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">DISC dimensions</h4>
+        <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">DISC placement</h4>
+        <p className="mt-2 text-sm text-muted-foreground">Din primære placering i DISC-firkanten vises med markøren.</p>
+        <div className="mt-4">
+          <DiscSquare x={placement.x} y={placement.y} />
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-border/70 p-4">
+        <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Scores</h4>
         <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
           <li>D: <span className="font-medium text-foreground">{formatDimensionValue(viewModel.dimensionScores.D)}</span></li>
           <li>I: <span className="font-medium text-foreground">{formatDimensionValue(viewModel.dimensionScores.I)}</span></li>
@@ -166,6 +208,19 @@ export function DiscResultPresentation({
           </details>
         ) : null}
       </section>
+
+      {pdfHref ? (
+        <div className="px-1">
+          <a
+            href={pdfHref}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex h-9 items-center rounded-md border border-input bg-background px-4 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+          >
+            Download PDF report
+          </a>
+        </div>
+      ) : null}
 
       {footerNote ? <p className="px-1 text-xs text-muted-foreground">{footerNote}</p> : null}
     </div>
