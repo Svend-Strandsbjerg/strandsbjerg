@@ -1,6 +1,15 @@
 export type DiscDimension = "D" | "I" | "S" | "C";
 export type ResponseRecord = Record<string, unknown>;
 type DimensionScores = Record<DiscDimension, number>;
+type CanonicalDiscResult = {
+  dimensions: unknown;
+  normalizedDimensions: unknown;
+  primaryDimension: unknown;
+  secondaryDimension: unknown;
+  profileSummary: unknown;
+  qualityIndicators: Record<string, unknown> | null;
+  lifecycleStatus: unknown;
+};
 
 export type DimensionInsight = {
   label: string;
@@ -76,12 +85,57 @@ function extractEngineResult(rawResponses: unknown): Record<string, unknown> | n
     return null;
   }
 
-  const nestedResult = toObject(root.result);
-  if (nestedResult) {
-    return nestedResult;
+  if (Array.isArray(root.responses) && toObject(root.result)) {
+    return toObject(root.result);
   }
 
   return root;
+}
+
+function hasCanonicalFields(value: Record<string, unknown> | null) {
+  if (!value) {
+    return false;
+  }
+
+  return [
+    "dimensions",
+    "normalizedDimensions",
+    "primaryDimension",
+    "secondaryDimension",
+    "profileSummary",
+    "qualityIndicators",
+    "lifecycleStatus",
+  ].some((key) => key in value);
+}
+
+export function extractCanonicalResult(rawResponses: unknown): CanonicalDiscResult | null {
+  const enginePayload = extractEngineResult(rawResponses);
+  if (!enginePayload) {
+    return null;
+  }
+
+  const nestedResult = toObject(enginePayload.result);
+  const nestedData = toObject(enginePayload.data);
+  const nestedDataResult = toObject(nestedData?.result);
+  const canonicalSource =
+    (hasCanonicalFields(nestedResult) ? nestedResult : null) ??
+    (hasCanonicalFields(nestedDataResult) ? nestedDataResult : null) ??
+    (hasCanonicalFields(nestedData) ? nestedData : null) ??
+    (hasCanonicalFields(enginePayload) ? enginePayload : null);
+
+  if (!canonicalSource) {
+    return null;
+  }
+
+  return {
+    dimensions: canonicalSource.dimensions,
+    normalizedDimensions: canonicalSource.normalizedDimensions,
+    primaryDimension: canonicalSource.primaryDimension,
+    secondaryDimension: canonicalSource.secondaryDimension,
+    profileSummary: canonicalSource.profileSummary,
+    qualityIndicators: toObject(canonicalSource.qualityIndicators),
+    lifecycleStatus: canonicalSource.lifecycleStatus,
+  };
 }
 
 export function normalizeResponseRecords(rawResponses: unknown): ResponseRecord[] {
@@ -147,12 +201,12 @@ function normalizeDimensionScoresFromRecord(record: Record<string, unknown>): Di
 }
 
 function extractEngineDimensionScores(rawResponses: unknown): DimensionScores | null {
-  const engineResult = extractEngineResult(rawResponses);
-  if (!engineResult) {
+  const canonicalResult = extractCanonicalResult(rawResponses);
+  if (!canonicalResult) {
     return null;
   }
 
-  const dimensionsObject = toObject(engineResult.dimensions);
+  const dimensionsObject = toObject(canonicalResult.normalizedDimensions) ?? toObject(canonicalResult.dimensions);
   if (dimensionsObject) {
     const directScores = normalizeDimensionScoresFromRecord(dimensionsObject);
     if (directScores) {
@@ -182,11 +236,11 @@ function extractEngineDimensionScores(rawResponses: unknown): DimensionScores | 
     }
   }
 
-  if (Array.isArray(engineResult.dimensions)) {
+  if (Array.isArray(canonicalResult.dimensions)) {
     const normalized: DimensionScores = { D: 0, I: 0, S: 0, C: 0 };
     let hasSignal = false;
 
-    for (const value of engineResult.dimensions) {
+    for (const value of canonicalResult.dimensions) {
       const entry = toObject(value);
       if (!entry) {
         continue;
@@ -209,10 +263,10 @@ function extractEngineDimensionScores(rawResponses: unknown): DimensionScores | 
 }
 
 export function extractInterpretationText(rawResponses: unknown) {
-  const engineResult = extractEngineResult(rawResponses);
+  const canonicalResult = extractCanonicalResult(rawResponses);
 
-  if (engineResult) {
-    const profileSummary = engineResult.profileSummary;
+  if (canonicalResult) {
+    const profileSummary = canonicalResult.profileSummary;
     if (typeof profileSummary === "string" && profileSummary.trim().length > 0) {
       return profileSummary.trim();
     }
@@ -236,15 +290,19 @@ export function extractInterpretationText(rawResponses: unknown) {
 
 export function buildDiscInsights(rawResponses: unknown) {
   const records = normalizeResponseRecords(rawResponses);
-  const dimensionCounts = extractEngineDimensionScores(rawResponses) ?? extractDimensionCounts(records);
-  const engineResult = extractEngineResult(rawResponses);
-  const qualityIndicators = toObject(engineResult?.qualityIndicators);
+  const canonicalResult = extractCanonicalResult(rawResponses);
+  const mappedDimensions = extractEngineDimensionScores(rawResponses);
+  const dimensionCounts = mappedDimensions ?? extractDimensionCounts(records);
+  const qualityIndicators = canonicalResult?.qualityIndicators ?? null;
   const rankedDimensions = (Object.entries(dimensionCounts) as Array<[DiscDimension, number]>).sort((a, b) => b[1] - a[1]);
-  const dominantDimension = rankedDimensions[0]?.[1] > 0 ? rankedDimensions[0][0] : null;
-  const secondaryDimension = rankedDimensions[1]?.[1] > 0 ? rankedDimensions[1][0] : null;
+  const mappedPrimaryDimension = normalizeToDiscDimension(canonicalResult?.primaryDimension);
+  const mappedSecondaryDimension = normalizeToDiscDimension(canonicalResult?.secondaryDimension);
+  const dominantDimension = mappedPrimaryDimension ?? (rankedDimensions[0]?.[1] > 0 ? rankedDimensions[0][0] : null);
+  const secondaryDimension = mappedSecondaryDimension ?? (rankedDimensions[1]?.[1] > 0 ? rankedDimensions[1][0] : null);
 
   return {
     records,
+    canonicalResult,
     dimensionCounts,
     dominantDimension,
     secondaryDimension,
@@ -252,6 +310,6 @@ export function buildDiscInsights(rawResponses: unknown) {
     secondaryInsight: secondaryDimension ? DISC_DIMENSION_MAP[secondaryDimension] : null,
     interpretationText: extractInterpretationText(rawResponses),
     qualityIndicators,
-    engineResult,
+    engineResult: canonicalResult,
   };
 }

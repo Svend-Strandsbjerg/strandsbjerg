@@ -16,6 +16,7 @@ import {
   validateDiscResponses,
 } from "@/lib/disc-engine";
 import { getInviteAccessState } from "@/lib/disc-invites";
+import { extractCanonicalResult } from "@/lib/disc-result-insights";
 import { logServerEvent } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import { enforceRateLimit } from "@/lib/rate-limit";
@@ -197,6 +198,9 @@ export async function submitInviteDiscAssessment(_: InviteDiscState, formData: F
     logServerEvent("info", "disc_invite_complete_call_succeeded", { sessionId });
     logServerEvent("info", "disc_invite_result_fetch_started", { sessionId });
     const resultPayload = await getDiscSessionResult(sessionId);
+    logServerEvent("info", "disc_invite_result_payload_raw", { sessionId, resultPayload });
+    const mappedResult = extractCanonicalResult({ result: resultPayload });
+    logServerEvent("info", "disc_invite_result_payload_mapped", { sessionId, mappedResult });
     const resultRecord = resultPayload as Record<string, unknown>;
     const nestedResult = resultRecord.result && typeof resultRecord.result === "object" ? (resultRecord.result as Record<string, unknown>) : null;
     logServerEvent("info", "disc_invite_result_fetch_succeeded", {

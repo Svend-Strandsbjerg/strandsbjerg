@@ -15,6 +15,7 @@ import {
   submitDiscResponses,
   validateDiscResponses,
 } from "@/lib/disc-engine";
+import { extractCanonicalResult } from "@/lib/disc-result-insights";
 import { logServerEvent } from "@/lib/logger";
 import { enforceRateLimit } from "@/lib/rate-limit";
 
@@ -186,6 +187,9 @@ export async function submitDiscAssessmentResponses(_: DiscFlowState, formData: 
     logServerEvent("info", "disc_flow_complete_call_succeeded", { userId, sessionId });
     logServerEvent("info", "disc_flow_result_fetch_started", { userId, sessionId });
     const resultPayload = await getDiscSessionResult(sessionId);
+    logServerEvent("info", "disc_flow_result_payload_raw", { userId, sessionId, resultPayload });
+    const mappedResult = extractCanonicalResult({ result: resultPayload });
+    logServerEvent("info", "disc_flow_result_payload_mapped", { userId, sessionId, mappedResult });
     const resultRecord = resultPayload as Record<string, unknown>;
     const dimensionsPayload = resultRecord.result && typeof resultRecord.result === "object"
       ? (resultRecord.result as Record<string, unknown>).dimensions

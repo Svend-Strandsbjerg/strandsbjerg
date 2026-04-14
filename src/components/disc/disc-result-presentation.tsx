@@ -53,6 +53,22 @@ function getDimensionSamples(records: ResponseRecord[]) {
   return samples;
 }
 
+function renderValue(value: unknown) {
+  if (value === null || value === undefined) {
+    return "—";
+  }
+
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
 export function DiscResultPresentation({
   title,
   status,
@@ -65,17 +81,28 @@ export function DiscResultPresentation({
   emptyMessage,
   footerNote,
 }: DiscResultPresentationProps) {
-  const { records, interpretationText, dominantInsight, secondaryInsight, dimensionCounts, qualityIndicators, engineResult } = buildDiscInsights(rawResponses);
+  const { records, interpretationText, dominantInsight, secondaryInsight, dimensionCounts, qualityIndicators, canonicalResult } = buildDiscInsights(rawResponses);
   const dimensionSamples = getDimensionSamples(records);
   const completionDate = submittedAt ?? (status === "SUBMITTED" ? createdAt : null);
   const qualityIndicatorEntries = qualityIndicators ? Object.entries(qualityIndicators) : [];
+  const renderedViewModel = {
+    status,
+    dimensionCounts,
+    primaryDimension: canonicalResult?.primaryDimension ?? null,
+    secondaryDimension: canonicalResult?.secondaryDimension ?? null,
+    lifecycleStatus: canonicalResult?.lifecycleStatus ?? null,
+    qualityIndicatorKeys: qualityIndicatorEntries.map(([key]) => key),
+  };
 
   console.info(
     JSON.stringify({
       event: "disc_result_render_payload",
-      hasEngineResult: Boolean(engineResult),
-      hasDimensions: Boolean((engineResult as Record<string, unknown> | null)?.dimensions),
-      hasProfileSummary: typeof (engineResult as Record<string, unknown> | null)?.profileSummary === "string",
+      rawEngineResultPayload: rawResponses,
+      mappedLocalResult: canonicalResult,
+      finalRenderedViewModel: renderedViewModel,
+      hasEngineResult: Boolean(canonicalResult),
+      hasDimensions: Boolean((canonicalResult as Record<string, unknown> | null)?.dimensions),
+      hasProfileSummary: typeof (canonicalResult as Record<string, unknown> | null)?.profileSummary === "string",
       hasQualityIndicators: qualityIndicatorEntries.length > 0,
       dimensionCounts,
     }),
@@ -162,12 +189,15 @@ export function DiscResultPresentation({
           <li>
             DISC signals: D {dimensionCounts.D} · I {dimensionCounts.I} · S {dimensionCounts.S} · C {dimensionCounts.C}
           </li>
+          <li>Primary dimension: {renderValue(canonicalResult?.primaryDimension)}</li>
+          <li>Secondary dimension: {renderValue(canonicalResult?.secondaryDimension)}</li>
+          <li>Lifecycle status: {renderValue(canonicalResult?.lifecycleStatus)}</li>
         </ul>
         {qualityIndicatorEntries.length > 0 ? (
           <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
             {qualityIndicatorEntries.slice(0, 6).map(([key, value]) => (
               <li key={key}>
-                Quality · {key}: <span className="font-medium text-foreground">{String(value)}</span>
+                Quality · {key}: <span className="font-medium text-foreground">{renderValue(value)}</span>
               </li>
             ))}
           </ul>
