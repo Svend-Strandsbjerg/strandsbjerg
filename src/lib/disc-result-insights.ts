@@ -1,5 +1,6 @@
 export type DiscDimension = "D" | "I" | "S" | "C";
 export type ResponseRecord = Record<string, unknown>;
+type DimensionScores = Record<DiscDimension, number>;
 
 export type DimensionInsight = {
   label: string;
@@ -44,6 +45,44 @@ export const DISC_DIMENSION_MAP: Record<DiscDimension, DimensionInsight> = {
     workStyle: "Works best where quality standards are explicit and careful planning is valued.",
   },
 };
+
+function toObject(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function toNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+function extractEngineResult(rawResponses: unknown): Record<string, unknown> | null {
+  const root = toObject(rawResponses);
+
+  if (!root) {
+    return null;
+  }
+
+  const nestedResult = toObject(root.result);
+  if (nestedResult) {
+    return nestedResult;
+  }
+
+  return root;
+}
 
 export function normalizeResponseRecords(rawResponses: unknown): ResponseRecord[] {
   if (Array.isArray(rawResponses)) {
@@ -92,7 +131,93 @@ export function extractDimensionCounts(records: ResponseRecord[]) {
   return counts;
 }
 
+function normalizeDimensionScoresFromRecord(record: Record<string, unknown>): DimensionScores | null {
+  const scores: DimensionScores = { D: 0, I: 0, S: 0, C: 0 };
+  let hasSignal = false;
+
+  for (const dimension of ["D", "I", "S", "C"] as const) {
+    const score = toNumber(record[dimension] ?? record[dimension.toLowerCase()]);
+    if (score !== null) {
+      scores[dimension] = score;
+      hasSignal = true;
+    }
+  }
+
+  return hasSignal ? scores : null;
+}
+
+function extractEngineDimensionScores(rawResponses: unknown): DimensionScores | null {
+  const engineResult = extractEngineResult(rawResponses);
+  if (!engineResult) {
+    return null;
+  }
+
+  const dimensionsObject = toObject(engineResult.dimensions);
+  if (dimensionsObject) {
+    const directScores = normalizeDimensionScoresFromRecord(dimensionsObject);
+    if (directScores) {
+      return directScores;
+    }
+
+    const normalized: DimensionScores = { D: 0, I: 0, S: 0, C: 0 };
+    let hasSignal = false;
+
+    for (const value of Object.values(dimensionsObject)) {
+      const entry = toObject(value);
+      if (!entry) {
+        continue;
+      }
+
+      const dimension = normalizeToDiscDimension(entry.dimension ?? entry.code ?? entry.name);
+      const score = toNumber(entry.score ?? entry.value ?? entry.normalizedScore ?? entry.percentage);
+
+      if (dimension && score !== null) {
+        normalized[dimension] = score;
+        hasSignal = true;
+      }
+    }
+
+    if (hasSignal) {
+      return normalized;
+    }
+  }
+
+  if (Array.isArray(engineResult.dimensions)) {
+    const normalized: DimensionScores = { D: 0, I: 0, S: 0, C: 0 };
+    let hasSignal = false;
+
+    for (const value of engineResult.dimensions) {
+      const entry = toObject(value);
+      if (!entry) {
+        continue;
+      }
+
+      const dimension = normalizeToDiscDimension(entry.dimension ?? entry.code ?? entry.name);
+      const score = toNumber(entry.score ?? entry.value ?? entry.normalizedScore ?? entry.percentage);
+      if (dimension && score !== null) {
+        normalized[dimension] = score;
+        hasSignal = true;
+      }
+    }
+
+    if (hasSignal) {
+      return normalized;
+    }
+  }
+
+  return null;
+}
+
 export function extractInterpretationText(rawResponses: unknown) {
+  const engineResult = extractEngineResult(rawResponses);
+
+  if (engineResult) {
+    const profileSummary = engineResult.profileSummary;
+    if (typeof profileSummary === "string" && profileSummary.trim().length > 0) {
+      return profileSummary.trim();
+    }
+  }
+
   if (!rawResponses || typeof rawResponses !== "object") {
     return null;
   }
@@ -111,7 +236,9 @@ export function extractInterpretationText(rawResponses: unknown) {
 
 export function buildDiscInsights(rawResponses: unknown) {
   const records = normalizeResponseRecords(rawResponses);
-  const dimensionCounts = extractDimensionCounts(records);
+  const dimensionCounts = extractEngineDimensionScores(rawResponses) ?? extractDimensionCounts(records);
+  const engineResult = extractEngineResult(rawResponses);
+  const qualityIndicators = toObject(engineResult?.qualityIndicators);
   const rankedDimensions = (Object.entries(dimensionCounts) as Array<[DiscDimension, number]>).sort((a, b) => b[1] - a[1]);
   const dominantDimension = rankedDimensions[0]?.[1] > 0 ? rankedDimensions[0][0] : null;
   const secondaryDimension = rankedDimensions[1]?.[1] > 0 ? rankedDimensions[1][0] : null;
@@ -124,5 +251,7 @@ export function buildDiscInsights(rawResponses: unknown) {
     dominantInsight: dominantDimension ? DISC_DIMENSION_MAP[dominantDimension] : null,
     secondaryInsight: secondaryDimension ? DISC_DIMENSION_MAP[secondaryDimension] : null,
     interpretationText: extractInterpretationText(rawResponses),
+    qualityIndicators,
+    engineResult,
   };
 }
