@@ -199,6 +199,20 @@ export function InviteDiscClient({ token, candidateLabel, inviteState, latestAss
         ) : (
           <p className="text-xs text-muted-foreground">A permanent result link will appear once processing completes.</p>
         )}
+
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            if (window.opener && !window.opener.closed) {
+              window.opener.location.href = "/disc";
+              window.opener.focus();
+            }
+            window.close();
+          }}
+        >
+          Close window and return to DISC
+        </Button>
       </div>
     );
   }
@@ -255,7 +269,7 @@ export function InviteDiscClient({ token, candidateLabel, inviteState, latestAss
             <p className="mt-2 text-sm text-muted-foreground">Du får ét spørgsmål ad gangen. Vælg det svar der føles mest rigtigt med det samme.</p>
             <p className="mt-2 text-sm font-medium text-foreground">Tager ca. 2–3 minutter.</p>
             <div className="mt-5 flex items-center justify-end gap-2">
-              <Button type="button" variant="ghost" onClick={() => setIsStartModalOpen(false)}>
+              <Button type="button" variant="outline" onClick={() => setIsStartModalOpen(false)}>
                 Luk
               </Button>
               <form action={startAction}>
@@ -303,7 +317,7 @@ export function InviteDiscClient({ token, candidateLabel, inviteState, latestAss
               ) : null}
             </div>
 
-            <div className="grid min-h-0 flex-1 gap-8 md:grid-cols-[240px_minmax(0,1fr)] md:items-start">
+            <div className="grid min-h-0 flex-1 gap-8 md:grid-cols-[240px_minmax(0,1fr)_240px] md:items-start">
               <aside className="sticky top-8 hidden max-h-[calc(100vh-4rem)] overflow-y-auto pr-2 md:block">
                 <p className="mb-4 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Answer timeline</p>
                 <div className="space-y-2">
@@ -327,66 +341,68 @@ export function InviteDiscClient({ token, candidateLabel, inviteState, latestAss
                 </div>
               </aside>
 
-              <div>
-            <div className="mb-8 space-y-3">
-              <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <span>Spørgsmål {activeQuestionIndex + 1} af {questions.length}</span>
-              </div>
-              <div className="h-2 overflow-hidden rounded-full bg-muted">
-                <div className="h-full rounded-full bg-foreground/80 transition-all duration-300" style={{ width: `${progressPercent}%` }} />
-              </div>
-            </div>
-
-            <div
-              className={cn(
-                "mx-auto mt-8 w-full max-w-2xl rounded-3xl border border-border/80 bg-card p-6 shadow-sm transition-opacity duration-200 sm:p-10",
-                isTransitioningQuestion && "opacity-0",
-              )}
-            >
-              <p className="text-xl font-medium leading-relaxed text-foreground sm:text-2xl">{activeQuestion.prompt}</p>
-
-              {activeQuestion.options.length > 0 ? (
-                <div className="mt-10 space-y-3">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground sm:text-sm">
-                    <span>{LIKERT_EDGE_LABELS.low}</span>
-                    <span>{LIKERT_EDGE_LABELS.high}</span>
+              <div className="flex flex-col items-center">
+                <div className="mb-8 w-full max-w-2xl space-y-3">
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <span>Spørgsmål {activeQuestionIndex + 1} af {questions.length}</span>
                   </div>
-                  <div className="grid grid-cols-5 gap-2 sm:gap-3">
-                    {activeQuestion.options.slice(0, 5).map((option, index) => {
-                      const selected = (selectedOptionIdByQuestionId[activeQuestion.id] ?? "") === option.id;
-                      return (
-                        <button
-                          key={`${activeQuestion.id}-${option.id}`}
-                          type="button"
-                          onClick={() => handleOptionSelect(option.id)}
-                          className={cn(
-                            "h-14 rounded-xl border text-sm font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
-                            "bg-gradient-to-b hover:-translate-y-0.5",
-                            LIKERT_TONES[index] ?? LIKERT_TONES[2],
-                            selected ? "ring-2 ring-foreground/70 shadow-sm" : "opacity-85 hover:opacity-100",
-                          )}
-                          aria-label={`${index + 1}. ${option.label}`}
-                        >
-                          <span className="sr-only">{option.label}</span>
-                        </button>
-                      );
-                    })}
+                  <div className="h-2 overflow-hidden rounded-full bg-muted">
+                    <div className="h-full rounded-full bg-foreground/80 transition-all duration-300" style={{ width: `${progressPercent}%` }} />
                   </div>
                 </div>
-              ) : (
-                <p className="mt-4 text-sm text-destructive">Question options are missing. Please restart your session.</p>
-              )}
 
-              {isCompletingAssessment || submitting ? (
-                <div className="mt-8 space-y-1 text-sm text-muted-foreground">
-                  <p>Processing your DISC profile...</p>
-                  <p className="text-xs">Vi samler dine svar og gør resultatet klar.</p>
+                <div
+                  className={cn(
+                    "w-full max-w-2xl rounded-3xl border border-border/80 bg-card p-6 shadow-sm transition-opacity duration-200 sm:p-10",
+                    isTransitioningQuestion && "opacity-0",
+                  )}
+                >
+                  <p className="text-xl font-medium leading-relaxed text-foreground sm:text-2xl">{activeQuestion.prompt}</p>
+
+                  {activeQuestion.options.length > 0 ? (
+                    <div className="mt-10 space-y-3">
+                      <div className="flex items-center justify-between text-xs text-muted-foreground sm:text-sm">
+                        <span>{LIKERT_EDGE_LABELS.low}</span>
+                        <span>{LIKERT_EDGE_LABELS.high}</span>
+                      </div>
+                      <div className="grid grid-cols-5 gap-2 sm:gap-3">
+                        {activeQuestion.options.slice(0, 5).map((option, index) => {
+                          const selected = (selectedOptionIdByQuestionId[activeQuestion.id] ?? "") === option.id;
+                          return (
+                            <button
+                              key={`${activeQuestion.id}-${option.id}`}
+                              type="button"
+                              onClick={() => handleOptionSelect(option.id)}
+                              className={cn(
+                                "h-14 rounded-xl border text-sm font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+                                "bg-gradient-to-b hover:-translate-y-0.5",
+                                LIKERT_TONES[index] ?? LIKERT_TONES[2],
+                                selected ? "ring-2 ring-foreground/70 shadow-sm" : "opacity-85 hover:opacity-100",
+                              )}
+                              aria-label={`${index + 1}. ${option.label}`}
+                            >
+                              <span className="sr-only">{option.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="mt-4 text-sm text-destructive">Question options are missing. Please restart your session.</p>
+                  )}
+
+                  {isCompletingAssessment || submitting ? (
+                    <div className="mt-8 space-y-1 text-sm text-muted-foreground">
+                      <p>Processing your DISC profile...</p>
+                      <p className="text-xs">Vi samler dine svar og gør resultatet klar.</p>
+                    </div>
+                  ) : (
+                    <p className="mt-8 text-sm text-muted-foreground">Vælg det svar der passer bedst — og gå videre.</p>
+                  )}
                 </div>
-              ) : (
-                <p className="mt-8 text-sm text-muted-foreground">Vælg det svar der passer bedst — og gå videre.</p>
-              )}
-            </div>
               </div>
+
+              <div className="hidden md:block" aria-hidden />
             </div>
           </div>
         </div>
