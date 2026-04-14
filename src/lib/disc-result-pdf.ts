@@ -1,5 +1,5 @@
 import type { SharedDiscResultRecord } from "@/lib/disc-result-access";
-import { buildDiscResultViewModel } from "@/lib/disc-result-insights";
+import { buildDiscResultViewModel, deriveDiscPlacement } from "@/lib/disc-result-insights";
 
 function formatDate(value: Date | null) {
   if (!value) {
@@ -96,14 +96,31 @@ export function createDiscResultPdf(shared: SharedDiscResultRecord) {
   const candidateLabel = assessment.candidateName ?? assessment.candidateEmail ?? "Candidate";
   const companyLabel = assessment.company?.name;
   const qualityIndicatorEntries = Object.entries(viewModel.qualityIndicators);
+  const placement = deriveDiscPlacement(viewModel.dimensionScores);
+  const profilePlacementLabel = {
+    DI: "DI (handlingsorienteret / udadvendt)",
+    IS: "IS (støttende / udadvendt)",
+    SC: "SC (stabil / reserveret)",
+    CD: "CD (analytisk / reserveret)",
+  }[placement.quadrant];
 
   const lines: string[] = [
-    "DISC Profile Result",
-    "DISC highlights how people tend to communicate, make decisions, and collaborate at work.",
+    "DISC Assessment Report",
+    "Dato/tid:",
+    `${new Intl.DateTimeFormat("da-DK", { dateStyle: "medium", timeStyle: "short" }).format(completionDate)}`,
+    "",
+    "Kort om DISC:",
+    "DISC beskriver typiske adfaerdsmoenstre inden for Dominance, Influence, Steadiness og Conscientiousness.",
     "",
     ...(companyLabel ? [`You have been invited by ${companyLabel}.`] : []),
     `Candidate: ${candidateLabel}`,
     `Completed: ${formatDate(completionDate)}`,
+    "",
+    "Overordnet resultat:",
+    `Primaer stil: ${viewModel.primaryDimension ?? "—"}`,
+    `Sekundaer stil: ${viewModel.secondaryDimension ?? "—"}`,
+    `Profilplacering i DISC-firkant: ${profilePlacementLabel}`,
+    `Placering (x/y): ${placement.x.toFixed(2)} / ${placement.y.toFixed(2)}`,
     "",
     "DISC dimensions",
     `D: ${formatDimensionValue(viewModel.dimensionScores.D)}`,

@@ -22,6 +22,12 @@ export type DiscResultViewModel = {
   qualityIndicators: Record<string, unknown>;
 };
 
+export type DiscPlacement = {
+  x: number;
+  y: number;
+  quadrant: "DI" | "IS" | "SC" | "CD";
+};
+
 function toObject(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
@@ -181,5 +187,37 @@ export function buildDiscResultViewModel(rawResponses: unknown): DiscResultViewM
     lifecycleStatus: parseLifecycleStatus(canonicalResult?.lifecycleStatus),
     dimensionScores,
     qualityIndicators: canonicalResult?.qualityIndicators ?? {},
+  };
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
+export function deriveDiscPlacement(dimensionScores: Record<DiscDimension, number | null>): DiscPlacement {
+  const D = dimensionScores.D ?? 0;
+  const I = dimensionScores.I ?? 0;
+  const S = dimensionScores.S ?? 0;
+  const C = dimensionScores.C ?? 0;
+  const total = D + I + S + C;
+
+  const x = total > 0 ? ((D + I) - (S + C)) / total : 0;
+  const y = total > 0 ? ((D + C) - (I + S)) / total : 0;
+  const clampedX = clamp(x, -1, 1);
+  const clampedY = clamp(y, -1, 1);
+
+  const quadrant =
+    clampedX >= 0 && clampedY >= 0
+      ? "DI"
+      : clampedX >= 0 && clampedY < 0
+        ? "IS"
+        : clampedX < 0 && clampedY < 0
+          ? "SC"
+          : "CD";
+
+  return {
+    x: clampedX,
+    y: clampedY,
+    quadrant,
   };
 }
