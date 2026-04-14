@@ -49,7 +49,7 @@ function StartAssessmentButton({
 export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments }: DiscAssessmentClientProps) {
   const [startState, startAction, starting] = useActionState(startDiscAssessment, initialDiscFlowState);
   const [submitState, submitAction, submitting] = useActionState(submitDiscAssessmentResponses, initialDiscFlowState);
-  const [responsesByQuestionId, setResponsesByQuestionId] = useState<Record<string, string>>({});
+  const [selectedOptionIdByQuestionId, setSelectedOptionIdByQuestionId] = useState<Record<string, string>>({});
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
 
   const currentSessionId = useMemo(() => submitState.sessionId || startState.sessionId, [startState.sessionId, submitState.sessionId]);
@@ -58,16 +58,36 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
   const submissionSucceeded = submitState.status === "success";
   const hasQuestions = questions.length > 0;
   const activeQuestion = hasQuestions ? questions[Math.min(activeQuestionIndex, questions.length - 1)] : null;
-  const allQuestionsAnswered = hasQuestions && questions.every((question) => (responsesByQuestionId[question.id] ?? "").trim().length > 0);
+  const allQuestionsAnswered =
+    hasQuestions &&
+    questions.every((question) => {
+      const selectedOptionId = selectedOptionIdByQuestionId[question.id] ?? "";
+      return selectedOptionId.length > 0 && question.options.some((option) => option.id === selectedOptionId);
+    });
   const responsesPayload = useMemo(
-    () => JSON.stringify(questions.filter((question) => (responsesByQuestionId[question.id] ?? "").trim().length > 0).map((question) => ({ questionId: question.id, value: responsesByQuestionId[question.id] }))),
-    [questions, responsesByQuestionId],
+    () =>
+      JSON.stringify(
+        questions
+          .map((question) => {
+            const selectedOptionId = selectedOptionIdByQuestionId[question.id] ?? "";
+            if (!currentSessionId || !selectedOptionId || !question.options.some((option) => option.id === selectedOptionId)) {
+              return null;
+            }
+            return {
+              sessionId: currentSessionId,
+              questionId: question.id,
+              selectedOptionIds: [selectedOptionId],
+            };
+          })
+          .filter((response): response is { sessionId: string; questionId: string; selectedOptionIds: string[] } => response !== null),
+      ),
+    [currentSessionId, questions, selectedOptionIdByQuestionId],
   );
 
-  const setResponse = (question: DiscQuestion, value: string) => {
-    setResponsesByQuestionId((previous) => ({
+  const setSelectedOptionId = (question: DiscQuestion, optionId: string) => {
+    setSelectedOptionIdByQuestionId((previous) => ({
       ...previous,
-      [question.id]: value,
+      [question.id]: optionId,
     }));
   };
 
@@ -124,15 +144,14 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
               {activeQuestion.options.length > 0 ? (
                 <div className="space-y-2">
                   {activeQuestion.options.map((option) => {
-                    const optionValue = String(option.value);
                     return (
-                      <label key={`${activeQuestion.id}-${optionValue}`} className="flex items-center gap-2 text-sm text-foreground">
+                      <label key={`${activeQuestion.id}-${option.id}`} className="flex items-center gap-2 text-sm text-foreground">
                         <input
                           type="radio"
                           name={`question-${activeQuestion.id}`}
-                          value={optionValue}
-                          checked={(responsesByQuestionId[activeQuestion.id] ?? "") === optionValue}
-                          onChange={(event) => setResponse(activeQuestion, event.target.value)}
+                          value={option.id}
+                          checked={(selectedOptionIdByQuestionId[activeQuestion.id] ?? "") === option.id}
+                          onChange={(event) => setSelectedOptionId(activeQuestion, event.target.value)}
                         />
                         <span>{option.label}</span>
                       </label>
@@ -140,13 +159,7 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
                   })}
                 </div>
               ) : (
-                <input
-                  type="text"
-                  value={responsesByQuestionId[activeQuestion.id] ?? ""}
-                  onChange={(event) => setResponse(activeQuestion, event.target.value)}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  placeholder="Type your answer"
-                />
+                <p className="text-sm text-destructive">Question options are missing. Please restart your session.</p>
               )}
 
               <div className="flex flex-wrap gap-2">
@@ -165,7 +178,13 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
             </div>
           ) : null}
 
-          <form action={submitAction} className="space-y-3">
+          <form
+            action={submitAction}
+            className="space-y-3"
+            onSubmit={() => {
+              console.log("DISC submit payload", responsesPayload);
+            }}
+          >
             <input type="hidden" name="sessionId" value={currentSessionId} />
             <input type="hidden" name="responses" value={responsesPayload} />
             <Button type="submit" disabled={submitting || !hasStartedSession || !allQuestionsAnswered || submissionSucceeded}>

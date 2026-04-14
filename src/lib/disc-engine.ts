@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { DiscQuestion, DiscQuestionOption, DiscResponseInput, DiscResponseValue } from "@/lib/disc-types";
+import type { DiscQuestion, DiscQuestionOption, DiscResponseInput } from "@/lib/disc-types";
 import { logServerEvent } from "@/lib/logger";
 
 export type DiscEngineSessionMetadata = {
@@ -71,20 +71,37 @@ export function validateDiscResponses(payload: unknown): DiscResponseInput[] {
       throw new DiscEngineError(`Response at index ${index} must be an object`);
     }
 
+    const sessionId = Reflect.get(item, "sessionId");
     const questionId = Reflect.get(item, "questionId");
-    const value = Reflect.get(item, "value");
+    const selectedOptionIds = Reflect.get(item, "selectedOptionIds");
+
+    if (typeof sessionId !== "string" || sessionId.trim().length === 0) {
+      throw new DiscEngineError(`Response at index ${index} has an invalid sessionId`);
+    }
 
     if (typeof questionId !== "string" || questionId.trim().length === 0) {
       throw new DiscEngineError(`Response at index ${index} has an invalid questionId`);
     }
 
-    if (!["string", "number", "boolean"].includes(typeof value)) {
-      throw new DiscEngineError(`Response at index ${index} has an invalid value`);
+    if (!Array.isArray(selectedOptionIds) || selectedOptionIds.length === 0) {
+      throw new DiscEngineError(`Response at index ${index} has invalid selectedOptionIds`);
+    }
+
+    const normalizedOptionIds = selectedOptionIds.map((optionId) => {
+      if (typeof optionId !== "string" || optionId.trim().length === 0) {
+        throw new DiscEngineError(`Response at index ${index} has an invalid selectedOptionIds entry`);
+      }
+      return optionId;
+    });
+
+    if (normalizedOptionIds.length !== 1) {
+      throw new DiscEngineError(`Response at index ${index} must include exactly one selected option id`);
     }
 
     return {
+      sessionId,
       questionId,
-      value: value as DiscResponseValue,
+      selectedOptionIds: normalizedOptionIds,
     };
   });
 }
@@ -210,28 +227,20 @@ function extractSessionIdFromCreateSessionResponse(payload: unknown): string | n
 }
 
 function parseQuestionOption(value: unknown): DiscQuestionOption | null {
-  if (typeof value === "string") {
-    return { value, label: value };
-  }
-
-  if (typeof value === "number" || typeof value === "boolean") {
-    return { value, label: String(value) };
-  }
-
   if (!value || typeof value !== "object") {
     return null;
   }
 
   const record = value as Record<string, unknown>;
-  const optionValue = record.value ?? record.id ?? record.key;
-  const optionLabel = record.label ?? record.text ?? optionValue;
+  const optionId = readStringKey(record, "id") ?? readStringKey(record, "optionId") ?? readStringKey(record, "option_id");
+  const optionLabel = readStringKey(record, "label") ?? readStringKey(record, "text");
 
-  if (!["string", "number", "boolean"].includes(typeof optionValue) || typeof optionLabel !== "string" || optionLabel.trim().length === 0) {
+  if (!optionId || !optionLabel) {
     return null;
   }
 
   return {
-    value: optionValue as DiscResponseValue,
+    id: optionId,
     label: optionLabel,
   };
 }
@@ -360,10 +369,13 @@ export async function submitDiscResponses(input: SubmitDiscResponsesRequest): Pr
 
   const validatedResponses = validateDiscResponses(input.responses);
 
-  const result = await discEngineRequest<SubmitDiscResponsesResponse>("/responses", {
+  const payload = {
     sessionId: input.sessionId,
     responses: validatedResponses,
-  });
+  };
+  logServerEvent("info", "disc_engine_submit_payload", payload);
+
+  const result = await discEngineRequest<SubmitDiscResponsesResponse>("/responses", payload);
 
   if (!result || typeof result !== "object") {
     logServerEvent("error", "disc_engine_malformed_responses_response", {

@@ -1,12 +1,11 @@
-export type DiscResponseValue = string | number | boolean;
-
 export type DiscResponseInput = {
+  sessionId: string;
   questionId: string;
-  value: DiscResponseValue;
+  selectedOptionIds: string[];
 };
 
 export type DiscQuestionOption = {
-  value: DiscResponseValue;
+  id: string;
   label: string;
 };
 
