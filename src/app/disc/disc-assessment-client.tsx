@@ -46,17 +46,7 @@ const LIKERT_TONES = [
 ] as const;
 
 const QUESTION_ADVANCE_DELAY_MS = 180;
-const COMPLETION_TRANSITION_DELAY_MS = 1050;
-const QUESTION_PREVIEW_MAX = 46;
-
-function toQuestionPreview(prompt: string) {
-  const collapsed = prompt.replace(/\s+/g, " ").trim();
-  if (collapsed.length <= QUESTION_PREVIEW_MAX) {
-    return collapsed;
-  }
-
-  return `${collapsed.slice(0, QUESTION_PREVIEW_MAX - 1).trimEnd()}…`;
-}
+const COMPLETION_TRANSITION_DELAY_MS = 250;
 
 export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments }: DiscAssessmentClientProps) {
   const router = useRouter();
@@ -64,6 +54,9 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
   const [submitState, submitAction, submitting] = useActionState(submitDiscAssessmentResponses, initialDiscFlowState);
   const [selectedOptionIdByQuestionId, setSelectedOptionIdByQuestionId] = useState<Record<string, string>>({});
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
+  const [furthestReachedQuestionIndex, setFurthestReachedQuestionIndex] = useState(0);
+  const [isSummaryStep, setIsSummaryStep] = useState(false);
+  const [isAssessmentModalOpen, setIsAssessmentModalOpen] = useState(false);
   const [isStartModalOpen, setIsStartModalOpen] = useState(false);
   const [isTransitioningQuestion, setIsTransitioningQuestion] = useState(false);
   const [isCompletingAssessment, setIsCompletingAssessment] = useState(false);
@@ -73,7 +66,7 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
   const questions = startState.questions;
   const hasStartedSession = Boolean(currentSessionId);
   const hasQuestions = questions.length > 0;
-  const activeQuestion = hasQuestions ? questions[Math.min(activeQuestionIndex, questions.length - 1)] : null;
+  const activeQuestion = hasQuestions && !isSummaryStep ? questions[Math.min(activeQuestionIndex, questions.length - 1)] : null;
   const [isMobileTimelineOpen, setIsMobileTimelineOpen] = useState(false);
 
   const timelineItems = useMemo(() => {
@@ -82,7 +75,7 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
         const answerId = selectedOptionIdByQuestionId[question.id] ?? "";
         const isCurrent = index === activeQuestionIndex;
         const isAnswered = Boolean(answerId);
-        const shouldShow = isCurrent || (index < activeQuestionIndex && isAnswered);
+        const shouldShow = index <= furthestReachedQuestionIndex || isCurrent;
         if (!shouldShow) {
           return null;
         }
@@ -92,11 +85,10 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
           index,
           isCurrent,
           isAnswered,
-          preview: toQuestionPreview(question.prompt),
         };
       })
-      .filter((item): item is { questionId: string; index: number; isCurrent: boolean; isAnswered: boolean; preview: string } => item !== null);
-  }, [activeQuestionIndex, questions, selectedOptionIdByQuestionId]);
+      .filter((item): item is { questionId: string; index: number; isCurrent: boolean; isAnswered: boolean } => item !== null);
+  }, [activeQuestionIndex, furthestReachedQuestionIndex, questions, selectedOptionIdByQuestionId]);
 
   const responsesPayload = useMemo(() => {
     const responses = questions
@@ -123,8 +115,21 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
   }, [currentSessionId, questions, selectedOptionIdByQuestionId]);
 
   useEffect(() => {
+    if (startState.status === "success" && startState.sessionId && startState.questions.length > 0) {
+      setIsAssessmentModalOpen(true);
+      setActiveQuestionIndex(0);
+      setFurthestReachedQuestionIndex(0);
+      setIsSummaryStep(false);
+      setSelectedOptionIdByQuestionId({});
+      setIsCompletingAssessment(false);
+    }
+  }, [startState.questions.length, startState.sessionId, startState.status]);
+
+  useEffect(() => {
     if (submitState.status === "success") {
       setIsCompletingAssessment(false);
+      setIsAssessmentModalOpen(false);
+      setIsSummaryStep(false);
       router.refresh();
     }
 
@@ -138,6 +143,11 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
       return;
     }
 
+    const nextAnswerMap = {
+      ...selectedOptionIdByQuestionId,
+      [activeQuestion.id]: optionId,
+    };
+
     setSelectedOptionIdByQuestionId((previous) => ({
       ...previous,
       [activeQuestion.id]: optionId,
@@ -145,19 +155,41 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
 
     const isLastQuestion = activeQuestionIndex >= questions.length - 1;
     if (isLastQuestion) {
-      setIsCompletingAssessment(true);
-      window.setTimeout(() => submitFormRef.current?.requestSubmit(), COMPLETION_TRANSITION_DELAY_MS);
+      setFurthestReachedQuestionIndex(questions.length - 1);
+      setIsSummaryStep(true);
       return;
     }
 
     setIsTransitioningQuestion(true);
     window.setTimeout(() => {
-      setActiveQuestionIndex((index) => Math.min(questions.length - 1, index + 1));
+      const nextIndex = Math.min(questions.length - 1, activeQuestionIndex + 1);
+      setActiveQuestionIndex(nextIndex);
+      setFurthestReachedQuestionIndex((previous) => Math.max(previous, nextIndex));
+      if (!nextAnswerMap[questions[nextIndex]?.id]) {
+        setIsSummaryStep(false);
+      }
       setIsTransitioningQuestion(false);
     }, QUESTION_ADVANCE_DELAY_MS);
   };
 
-  const progressPercent = hasQuestions ? ((activeQuestionIndex + 1) / questions.length) * 100 : 0;
+  const progressPercent = hasQuestions ? (((furthestReachedQuestionIndex + 1) / questions.length) * 100) : 0;
+  const answeredCount = questions.filter((question) => Boolean(selectedOptionIdByQuestionId[question.id])).length;
+  const isReadyForSubmit = hasQuestions && answeredCount === questions.length;
+
+  const handleQuestionJump = (index: number) => {
+    setActiveQuestionIndex(index);
+    setIsSummaryStep(false);
+    setIsMobileTimelineOpen(false);
+  };
+
+  const handleCloseAssessment = () => {
+    if (!currentSessionId || !isReadyForSubmit || isCompletingAssessment || submitting) {
+      return;
+    }
+
+    setIsCompletingAssessment(true);
+    window.setTimeout(() => submitFormRef.current?.requestSubmit(), COMPLETION_TRANSITION_DELAY_MS);
+  };
 
   return (
     <>
@@ -276,7 +308,7 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
         </div>
       ) : null}
 
-      {hasStartedSession && activeQuestion ? (
+      {hasStartedSession && isAssessmentModalOpen ? (
         <div className="fixed inset-0 z-50 bg-background">
           <div className="mx-auto flex min-h-full w-full max-w-6xl flex-col px-4 py-6 sm:px-8 sm:py-8">
             <div className="mb-6 rounded-2xl border border-border/60 bg-muted/20 p-3 md:hidden">
@@ -286,26 +318,22 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
                 className="flex w-full items-center justify-between text-left"
               >
                 <span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Answer review</span>
-                <span className="text-xs text-muted-foreground">{timelineItems.length} shown</span>
+                <span className="text-xs text-muted-foreground">{answeredCount}/{questions.length}</span>
               </button>
               {isMobileTimelineOpen ? (
-                <div className="mt-3 space-y-2">
+                <div className="mt-3 grid grid-cols-4 gap-2">
                   {timelineItems.map((item) => (
                     <button
                       key={item.questionId}
                       type="button"
-                      onClick={() => {
-                        setActiveQuestionIndex(item.index);
-                        setIsMobileTimelineOpen(false);
-                      }}
+                      onClick={() => handleQuestionJump(item.index)}
                       disabled={!item.isAnswered && !item.isCurrent}
                       className={cn(
-                        "w-full rounded-xl border px-3 py-2 text-left text-xs transition",
-                        item.isCurrent ? "border-foreground/40 bg-foreground/5 text-foreground" : "border-border/70 bg-card text-muted-foreground hover:text-foreground",
+                        "w-full rounded-lg border px-2 py-2 text-center text-[11px] transition",
+                        item.isCurrent ? "border-foreground/45 bg-foreground/5 text-foreground" : "border-border/60 bg-card text-muted-foreground hover:text-foreground",
                       )}
                     >
-                      <span className="mr-1 text-[11px] uppercase tracking-[0.12em]">#{item.index + 1}</span>
-                      {item.preview}
+                      <span>{item.index + 1}</span>
                     </button>
                   ))}
                 </div>
@@ -313,43 +341,86 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
             </div>
 
             <div className="grid min-h-0 flex-1 gap-8 md:grid-cols-[240px_minmax(0,1fr)] md:items-start">
-              <aside className="sticky top-8 hidden max-h-[calc(100vh-4rem)] overflow-y-auto pr-2 md:block">
-                <p className="mb-4 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Answer timeline</p>
-                <div className="space-y-2">
-                  {timelineItems.map((item, itemIndex) => (
+              <aside className="sticky top-8 hidden pr-2 md:block">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Oversigt</p>
+                <div className="rounded-2xl border border-border/60 bg-muted/10 p-3">
+                  <p className="mb-3 text-[11px] text-muted-foreground">{answeredCount} af {questions.length} besvaret</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {timelineItems.map((item) => (
                     <button
                       key={item.questionId}
                       type="button"
-                      onClick={() => setActiveQuestionIndex(item.index)}
+                      onClick={() => handleQuestionJump(item.index)}
                       disabled={!item.isAnswered && !item.isCurrent}
                       className={cn(
-                        "group relative w-full rounded-xl border px-3 py-2 text-left transition",
-                        item.isCurrent ? "border-foreground/40 bg-foreground/5 text-foreground shadow-sm" : "border-border/70 bg-card text-muted-foreground hover:border-border hover:text-foreground",
+                        "flex h-9 items-center justify-center rounded-lg border text-xs font-medium transition",
+                        item.isCurrent ? "border-foreground/45 bg-foreground/5 text-foreground" : "border-border/60 bg-card text-muted-foreground hover:text-foreground",
+                        item.isAnswered ? "" : "opacity-70",
                       )}
                     >
-                      {itemIndex < timelineItems.length - 1 ? <span className="pointer-events-none absolute -bottom-3 left-5 h-3 w-px bg-border/80" /> : null}
-                      <span className={cn("mr-2 inline-block h-2 w-2 rounded-full", item.isCurrent ? "bg-foreground" : "bg-muted-foreground/60")} />
-                      <span className="text-[11px] uppercase tracking-[0.12em]">#{item.index + 1}</span>
-                      <p className="mt-1 line-clamp-2 text-xs leading-relaxed">{item.preview}</p>
+                      {item.index + 1}
                     </button>
                   ))}
+                  </div>
+                  {furthestReachedQuestionIndex > activeQuestionIndex ? (
+                    <button
+                      type="button"
+                      onClick={() => handleQuestionJump(furthestReachedQuestionIndex)}
+                      className="mt-3 text-xs font-medium text-foreground/80 hover:text-foreground"
+                    >
+                      Tilbage til spørgsmål {furthestReachedQuestionIndex + 1}
+                    </button>
+                  ) : null}
                 </div>
               </aside>
 
               <div>
             <div className="mb-8 space-y-3">
               <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <span>Spørgsmål {activeQuestionIndex + 1} af {questions.length}</span>
+                <span>{isSummaryStep ? "Afsluttende overblik" : `Spørgsmål ${activeQuestionIndex + 1} af ${questions.length}`}</span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-muted">
                 <div className="h-full rounded-full bg-foreground/80 transition-all duration-300" style={{ width: `${progressPercent}%` }} />
               </div>
             </div>
 
-            <div className={cn("mx-auto mt-8 w-full max-w-2xl rounded-3xl border border-border/80 bg-card p-6 shadow-sm transition-opacity duration-200 sm:p-10", isTransitioningQuestion && "opacity-0")}> 
-              <p className="text-xl font-medium leading-relaxed text-foreground sm:text-2xl">{activeQuestion.prompt}</p>
+            <div className={cn("mx-auto mt-8 w-full max-w-2xl rounded-3xl border border-border/80 bg-card p-6 shadow-sm transition-opacity duration-200 sm:p-10", isTransitioningQuestion && "opacity-0")}>
+              {isSummaryStep ? (
+                <div>
+                  <p className="text-xl font-semibold text-foreground sm:text-2xl">Gennemgå dine svar</p>
+                  <p className="mt-2 text-sm text-muted-foreground">Du kan hurtigt kontrollere alle svar, før du afslutter testen.</p>
+                  <div className="mt-6 space-y-2">
+                    {questions.map((question, index) => {
+                      const isAnswered = Boolean(selectedOptionIdByQuestionId[question.id]);
+                      return (
+                        <button
+                          key={question.id}
+                          type="button"
+                          onClick={() => handleQuestionJump(index)}
+                          className={cn(
+                            "flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left text-sm transition",
+                            isAnswered ? "border-border/70 bg-card hover:border-foreground/30" : "border-destructive/40 bg-destructive/5",
+                          )}
+                        >
+                          <span>Spørgsmål {index + 1}</span>
+                          <span className={cn("text-xs", isAnswered ? "text-emerald-700 dark:text-emerald-300" : "text-destructive")}>
+                            {isAnswered ? "Besvaret" : "Mangler svar"}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-8 flex justify-end">
+                    <Button type="button" onClick={handleCloseAssessment} disabled={!isReadyForSubmit || isCompletingAssessment || submitting}>
+                      {isCompletingAssessment || submitting ? "Gemmer..." : "Luk"}
+                    </Button>
+                  </div>
+                </div>
+              ) : activeQuestion ? (
+                <>
+                  <p className="text-xl font-medium leading-relaxed text-foreground sm:text-2xl">{activeQuestion.prompt}</p>
 
-              {activeQuestion.options.length > 0 ? (
+                  {activeQuestion.options.length > 0 ? (
                 <div className="mt-10 space-y-3">
                   <div className="flex items-center justify-between text-xs text-muted-foreground sm:text-sm">
                     <span>{LIKERT_EDGE_LABELS.low}</span>
@@ -364,14 +435,17 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
                           type="button"
                           onClick={() => handleOptionSelect(option.id)}
                           className={cn(
-                            "h-14 rounded-xl border text-sm font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
-                            "bg-gradient-to-b hover:-translate-y-0.5",
+                            "relative h-14 rounded-xl border text-sm font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+                            "bg-gradient-to-b hover:-translate-y-0.5 dark:opacity-90",
                             LIKERT_TONES[index] ?? LIKERT_TONES[2],
-                            selected ? "ring-2 ring-foreground/70 shadow-sm" : "opacity-85 hover:opacity-100",
+                            selected
+                              ? "border-foreground/60 ring-2 ring-foreground/55 shadow-[0_0_0_1px_rgba(15,23,42,0.08)] dark:shadow-[0_0_0_1px_rgba(148,163,184,0.18)]"
+                              : "opacity-90 hover:opacity-100",
                           )}
                           aria-label={`${index + 1}. ${option.label}`}
                         >
                           <span className="sr-only">{option.label}</span>
+                          {selected ? <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-foreground/85" /> : null}
                         </button>
                       );
                     })}
@@ -380,15 +454,16 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
               ) : (
                 <p className="mt-4 text-sm text-destructive">Question options are missing. Please restart your session.</p>
               )}
-
+                </>
+              ) : null}
               {isCompletingAssessment || submitting ? (
                 <div className="mt-8 space-y-1 text-sm text-muted-foreground">
                   <p>Processing your DISC profile...</p>
                   <p className="text-xs">Vi samler dine svar og gør resultatet klar.</p>
                 </div>
-              ) : (
+              ) : !isSummaryStep ? (
                 <p className="mt-8 text-sm text-muted-foreground">Vælg det svar der passer bedst — og gå videre.</p>
-              )}
+              ) : null}
             </div>
               </div>
             </div>
