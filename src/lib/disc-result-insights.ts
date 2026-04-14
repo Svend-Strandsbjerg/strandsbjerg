@@ -1,6 +1,6 @@
 export type DiscDimension = "D" | "I" | "S" | "C";
 export type ResponseRecord = Record<string, unknown>;
-type DimensionScores = Record<DiscDimension, number>;
+
 type CanonicalDiscResult = {
   dimensions: unknown;
   normalizedDimensions: unknown;
@@ -11,48 +11,15 @@ type CanonicalDiscResult = {
   lifecycleStatus: unknown;
 };
 
-export type DimensionInsight = {
-  label: string;
-  summary: string;
-  strengths: string[];
-  challenges: string[];
-  communication: string;
-  workStyle: string;
-};
-
-export const DISC_DIMENSION_MAP: Record<DiscDimension, DimensionInsight> = {
-  D: {
-    label: "Dominance (D)",
-    summary: "Direct, results-oriented, and comfortable taking charge in uncertain situations.",
-    strengths: ["Moves quickly toward decisions", "Takes ownership under pressure", "Challenges blockers to keep momentum"],
-    challenges: ["May appear too blunt in sensitive conversations", "Can overlook consensus when speed is prioritized"],
-    communication: "Prefers concise communication focused on outcomes, decisions, and clear priorities.",
-    workStyle: "Works best with autonomy, ambitious targets, and room to lead execution.",
-  },
-  I: {
-    label: "Influence (I)",
-    summary: "Engaging, persuasive, and energized by collaboration and visible progress.",
-    strengths: ["Builds rapport quickly", "Motivates teams with optimism", "Explains ideas in an accessible way"],
-    challenges: ["May lose detail when moving fast", "Can overcommit when enthusiasm is high"],
-    communication: "Responds well to conversational, positive dialogue with room for idea exchange.",
-    workStyle: "Works best in collaborative environments with recognition, people contact, and creative problem-solving.",
-  },
-  S: {
-    label: "Steadiness (S)",
-    summary: "Reliable, patient, and focused on stability, support, and long-term consistency.",
-    strengths: ["Creates dependable routines", "Supports team cohesion", "Remains calm in changing situations"],
-    challenges: ["May delay difficult trade-off decisions", "Can resist abrupt change without context"],
-    communication: "Prefers respectful, steady communication with clear expectations and practical next steps.",
-    workStyle: "Works best with predictable processes, supportive teams, and clarity around responsibilities.",
-  },
-  C: {
-    label: "Conscientiousness (C)",
-    summary: "Analytical, quality-focused, and attentive to structure, standards, and risk.",
-    strengths: ["Delivers high-quality output", "Identifies risks early", "Builds robust, well-structured solutions"],
-    challenges: ["May overanalyze before acting", "Can become perfectionistic under tight deadlines"],
-    communication: "Prefers precise, evidence-based communication with clear criteria and rationale.",
-    workStyle: "Works best where quality standards are explicit and careful planning is valued.",
-  },
+export type DiscResultViewModel = {
+  canonicalResult: CanonicalDiscResult | null;
+  responseCount: number;
+  profileSummary: string | null;
+  primaryDimension: DiscDimension | null;
+  secondaryDimension: DiscDimension | null;
+  lifecycleStatus: string | null;
+  dimensionScores: Record<DiscDimension, number | null>;
+  qualityIndicators: Record<string, unknown>;
 };
 
 function toObject(value: unknown): Record<string, unknown> | null {
@@ -74,6 +41,21 @@ function toNumber(value: unknown): number | null {
       return parsed;
     }
   }
+
+  return null;
+}
+
+function normalizeToDiscDimension(value: unknown): DiscDimension | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = value.trim().toUpperCase();
+
+  if (normalized === "D" || normalized === "DOMINANCE") return "D";
+  if (normalized === "I" || normalized === "INFLUENCE") return "I";
+  if (normalized === "S" || normalized === "STEADINESS") return "S";
+  if (normalized === "C" || normalized === "CONSCIENTIOUSNESS" || normalized === "COMPLIANCE") return "C";
 
   return null;
 }
@@ -152,193 +134,52 @@ export function normalizeResponseRecords(rawResponses: unknown): ResponseRecord[
   return [];
 }
 
-function normalizeToDiscDimension(value: unknown): DiscDimension | null {
+function extractDimensionScoresFromObject(source: Record<string, unknown> | null): Record<DiscDimension, number | null> {
+  const scores: Record<DiscDimension, number | null> = {
+    D: null,
+    I: null,
+    S: null,
+    C: null,
+  };
+
+  if (!source) {
+    return scores;
+  }
+
+  for (const dimension of ["D", "I", "S", "C"] as const) {
+    scores[dimension] = toNumber(source[dimension] ?? source[dimension.toLowerCase()]);
+  }
+
+  return scores;
+}
+
+function parseProfileSummary(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+function parseLifecycleStatus(value: unknown): string | null {
   if (typeof value !== "string") {
     return null;
   }
 
-  const normalized = value.trim().toUpperCase();
-
-  if (normalized === "D" || normalized === "DOMINANCE") return "D";
-  if (normalized === "I" || normalized === "INFLUENCE") return "I";
-  if (normalized === "S" || normalized === "STEADINESS") return "S";
-  if (normalized === "C" || normalized === "CONSCIENTIOUSNESS" || normalized === "COMPLIANCE") return "C";
-
-  return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
-export function extractDimensionCounts(records: ResponseRecord[]) {
-  const counts: Record<DiscDimension, number> = { D: 0, I: 0, S: 0, C: 0 };
-
-  for (const entry of records) {
-    const candidates = [entry.dimension, entry.trait, entry.value, entry.discDimension];
-
-    for (const candidate of candidates) {
-      const dimension = normalizeToDiscDimension(candidate);
-      if (dimension) {
-        counts[dimension] += 1;
-        break;
-      }
-    }
-  }
-
-  return counts;
-}
-
-function normalizeDimensionScoresFromRecord(record: Record<string, unknown>): DimensionScores | null {
-  const scores: DimensionScores = { D: 0, I: 0, S: 0, C: 0 };
-  let hasSignal = false;
-
-  for (const dimension of ["D", "I", "S", "C"] as const) {
-    const score = toNumber(record[dimension] ?? record[dimension.toLowerCase()]);
-    if (score !== null) {
-      scores[dimension] = score;
-      hasSignal = true;
-    }
-  }
-
-  return hasSignal ? scores : null;
-}
-
-function mergeDimensionScores(target: DimensionScores, source: DimensionScores) {
-  for (const dimension of ["D", "I", "S", "C"] as const) {
-    target[dimension] = source[dimension];
-  }
-}
-
-function extractDimensionFromEntry(entry: Record<string, unknown>) {
-  return normalizeToDiscDimension(entry.dimension ?? entry.discDimension ?? entry.trait ?? entry.code ?? entry.name);
-}
-
-function extractScoreFromEntry(entry: Record<string, unknown>) {
-  return toNumber(entry.score ?? entry.value ?? entry.normalizedScore ?? entry.percentage ?? entry.count ?? entry.rawScore);
-}
-
-function collectDimensionScores(value: unknown, depth = 0): DimensionScores | null {
-  if (depth > 6) {
-    return null;
-  }
-
-  const fromRecord = toObject(value);
-  if (fromRecord) {
-    const directScores = normalizeDimensionScoresFromRecord(fromRecord);
-    if (directScores) {
-      return directScores;
-    }
-
-    const dimension = extractDimensionFromEntry(fromRecord);
-    const score = extractScoreFromEntry(fromRecord);
-    if (dimension && score !== null) {
-      return { D: dimension === "D" ? score : 0, I: dimension === "I" ? score : 0, S: dimension === "S" ? score : 0, C: dimension === "C" ? score : 0 };
-    }
-
-    const aggregate: DimensionScores = { D: 0, I: 0, S: 0, C: 0 };
-    let hasSignal = false;
-
-    for (const key of ["dimensions", "normalizedDimensions", "scores", "signals", "discSignals", "dimensionScores", "result"] as const) {
-      const nested = collectDimensionScores(fromRecord[key], depth + 1);
-      if (nested) {
-        mergeDimensionScores(aggregate, nested);
-        hasSignal = true;
-      }
-    }
-
-    if (!hasSignal) {
-      for (const nestedValue of Object.values(fromRecord)) {
-        const nested = collectDimensionScores(nestedValue, depth + 1);
-        if (nested) {
-          mergeDimensionScores(aggregate, nested);
-          hasSignal = true;
-        }
-      }
-    }
-
-    return hasSignal ? aggregate : null;
-  }
-
-  if (Array.isArray(value)) {
-    const aggregate: DimensionScores = { D: 0, I: 0, S: 0, C: 0 };
-    let hasSignal = false;
-
-    for (const entry of value) {
-      const nested = collectDimensionScores(entry, depth + 1);
-      if (!nested) {
-        continue;
-      }
-
-      mergeDimensionScores(aggregate, nested);
-      hasSignal = true;
-    }
-
-    return hasSignal ? aggregate : null;
-  }
-
-  return null;
-}
-
-function extractEngineDimensionScores(rawResponses: unknown): DimensionScores | null {
+export function buildDiscResultViewModel(rawResponses: unknown): DiscResultViewModel {
   const canonicalResult = extractCanonicalResult(rawResponses);
-  const enginePayload = extractEngineResult(rawResponses);
-  const candidates: unknown[] = [canonicalResult?.normalizedDimensions, canonicalResult?.dimensions, canonicalResult, enginePayload];
-
-  for (const candidate of candidates) {
-    const scores = collectDimensionScores(candidate);
-    if (scores) {
-      return scores;
-    }
-  }
-
-  return null;
-}
-
-export function extractInterpretationText(rawResponses: unknown) {
-  const canonicalResult = extractCanonicalResult(rawResponses);
-
-  if (canonicalResult) {
-    const profileSummary = canonicalResult.profileSummary;
-    if (typeof profileSummary === "string" && profileSummary.trim().length > 0) {
-      return profileSummary.trim();
-    }
-  }
-
-  if (!rawResponses || typeof rawResponses !== "object") {
-    return null;
-  }
-
-  const candidates = ["interpretation", "summary", "profileSummary", "resultText"] as const;
-
-  for (const key of candidates) {
-    const value = (rawResponses as Record<string, unknown>)[key];
-    if (typeof value === "string" && value.trim().length > 0) {
-      return value.trim();
-    }
-  }
-
-  return null;
-}
-
-export function buildDiscInsights(rawResponses: unknown) {
-  const records = normalizeResponseRecords(rawResponses);
-  const canonicalResult = extractCanonicalResult(rawResponses);
-  const dimensionCounts = extractEngineDimensionScores(rawResponses) ?? extractDimensionCounts(records);
-  const qualityIndicators = canonicalResult?.qualityIndicators ?? null;
-  const rankedDimensions = (Object.entries(dimensionCounts) as Array<[DiscDimension, number]>).sort((a, b) => b[1] - a[1]);
-  const mappedPrimaryDimension = normalizeToDiscDimension(canonicalResult?.primaryDimension);
-  const mappedSecondaryDimension = normalizeToDiscDimension(canonicalResult?.secondaryDimension);
-  const dominantDimension = mappedPrimaryDimension ?? (rankedDimensions[0]?.[1] > 0 ? rankedDimensions[0][0] : null);
-  const rankedSecondary = rankedDimensions.find(([dimension, score]) => dimension !== dominantDimension && score > 0)?.[0] ?? null;
-  const secondaryDimension = mappedSecondaryDimension ?? rankedSecondary;
+  const dimensionScores = extractDimensionScoresFromObject(
+    toObject(canonicalResult?.normalizedDimensions) ?? toObject(canonicalResult?.dimensions),
+  );
 
   return {
-    records,
     canonicalResult,
-    dimensionCounts,
-    dominantDimension,
-    secondaryDimension,
-    dominantInsight: dominantDimension ? DISC_DIMENSION_MAP[dominantDimension] : null,
-    secondaryInsight: secondaryDimension ? DISC_DIMENSION_MAP[secondaryDimension] : null,
-    interpretationText: extractInterpretationText(rawResponses),
-    qualityIndicators,
-    engineResult: canonicalResult,
+    responseCount: normalizeResponseRecords(rawResponses).length,
+    profileSummary: parseProfileSummary(canonicalResult?.profileSummary),
+    primaryDimension: normalizeToDiscDimension(canonicalResult?.primaryDimension),
+    secondaryDimension: normalizeToDiscDimension(canonicalResult?.secondaryDimension),
+    lifecycleStatus: parseLifecycleStatus(canonicalResult?.lifecycleStatus),
+    dimensionScores,
+    qualityIndicators: canonicalResult?.qualityIndicators ?? {},
   };
 }
