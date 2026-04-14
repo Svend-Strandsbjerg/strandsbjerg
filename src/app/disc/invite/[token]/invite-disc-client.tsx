@@ -9,7 +9,7 @@ import {
 } from "@/app/disc/invite/[token]/actions";
 import { DiscResultPresentation } from "@/components/disc/disc-result-presentation";
 import { Button } from "@/components/ui/button";
-import type { DiscQuestion } from "@/lib/disc-types";
+import type { DiscQuestion, DiscResponseValue } from "@/lib/disc-types";
 
 type InviteDiscClientProps = {
   token: string;
@@ -48,7 +48,7 @@ function CopyResultLinkButton({ resultLink }: { resultLink: string }) {
 export function InviteDiscClient({ token, candidateLabel, inviteState, latestAssessment }: InviteDiscClientProps) {
   const [startState, startAction, starting] = useActionState(startInviteDiscAssessment, initialInviteDiscState);
   const [submitState, submitAction, submitting] = useActionState(submitInviteDiscAssessment, initialInviteDiscState);
-  const [responsesByQuestionId, setResponsesByQuestionId] = useState<Record<string, string>>({});
+  const [responsesByQuestionId, setResponsesByQuestionId] = useState<Record<string, DiscResponseValue | undefined>>({});
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
 
   const currentSessionId = useMemo(() => submitState.sessionId || startState.sessionId, [startState.sessionId, submitState.sessionId]);
@@ -57,18 +57,27 @@ export function InviteDiscClient({ token, candidateLabel, inviteState, latestAss
   const submissionSucceeded = submitState.status === "success";
   const hasQuestions = questions.length > 0;
   const activeQuestion = hasQuestions ? questions[Math.min(activeQuestionIndex, questions.length - 1)] : null;
-  const allQuestionsAnswered = hasQuestions && questions.every((question) => (responsesByQuestionId[question.id] ?? "").trim().length > 0);
+  const activeQuestionResponse = activeQuestion ? responsesByQuestionId[activeQuestion.id] : undefined;
+  const hasResponse = (questionId: string) => {
+    const response = responsesByQuestionId[questionId];
+    if (typeof response === "string") {
+      return response.trim().length > 0;
+    }
+
+    return response !== undefined;
+  };
+  const allQuestionsAnswered = hasQuestions && questions.every((question) => hasResponse(question.id));
   const responsesPayload = useMemo(
     () =>
       JSON.stringify(
         questions
-          .filter((question) => (responsesByQuestionId[question.id] ?? "").trim().length > 0)
+          .filter((question) => hasResponse(question.id))
           .map((question) => ({ questionId: question.id, value: responsesByQuestionId[question.id] })),
       ),
     [questions, responsesByQuestionId],
   );
 
-  const setResponse = (question: DiscQuestion, value: string) => {
+  const setResponse = (question: DiscQuestion, value: DiscResponseValue) => {
     setResponsesByQuestionId((previous) => ({
       ...previous,
       [question.id]: value,
@@ -148,15 +157,16 @@ export function InviteDiscClient({ token, candidateLabel, inviteState, latestAss
           {activeQuestion.options.length > 0 ? (
             <div className="space-y-2">
               {activeQuestion.options.map((option) => {
-                const optionValue = String(option.value);
+                const optionValue = option.value;
+                const optionValueId = typeof optionValue === "string" ? optionValue : JSON.stringify(optionValue);
                 return (
-                  <label key={`${activeQuestion.id}-${optionValue}`} className="flex items-center gap-2 text-sm text-foreground">
+                  <label key={`${activeQuestion.id}-${optionValueId}`} className="flex items-center gap-2 text-sm text-foreground">
                     <input
                       type="radio"
                       name={`question-${activeQuestion.id}`}
-                      value={optionValue}
-                      checked={(responsesByQuestionId[activeQuestion.id] ?? "") === optionValue}
-                      onChange={(event) => setResponse(activeQuestion, event.target.value)}
+                      value={String(optionValue)}
+                      checked={responsesByQuestionId[activeQuestion.id] === optionValue}
+                      onChange={() => setResponse(activeQuestion, optionValue)}
                     />
                     <span>{option.label}</span>
                   </label>
@@ -166,7 +176,7 @@ export function InviteDiscClient({ token, candidateLabel, inviteState, latestAss
           ) : (
             <input
               type="text"
-              value={responsesByQuestionId[activeQuestion.id] ?? ""}
+              value={typeof activeQuestionResponse === "string" ? activeQuestionResponse : ""}
               onChange={(event) => setResponse(activeQuestion, event.target.value)}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               placeholder="Type your answer"
