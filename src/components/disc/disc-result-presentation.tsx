@@ -11,7 +11,15 @@ type DiscResultPresentationProps = {
   companyLabel?: string;
   emptyMessage?: string;
   footerNote?: string;
+  pdfHref?: string;
 };
+
+const DISC_DIMENSIONS = [
+  { key: "D", label: "Dominance", color: "bg-red-500", lightColor: "bg-red-100", textColor: "text-red-900" },
+  { key: "I", label: "Influence", color: "bg-yellow-400", lightColor: "bg-yellow-100", textColor: "text-yellow-900" },
+  { key: "S", label: "Steadiness", color: "bg-green-500", lightColor: "bg-green-100", textColor: "text-green-900" },
+  { key: "C", label: "Conscientiousness", color: "bg-blue-500", lightColor: "bg-blue-100", textColor: "text-blue-900" },
+] as const;
 
 function formatDate(value: Date | null) {
   if (!value) {
@@ -60,6 +68,7 @@ export function DiscResultPresentation({
   companyLabel,
   emptyMessage,
   footerNote,
+  pdfHref,
 }: DiscResultPresentationProps) {
   const viewModel = buildDiscResultViewModel(rawResponses);
   const completionDate = submittedAt ?? (status === "SUBMITTED" ? createdAt : null);

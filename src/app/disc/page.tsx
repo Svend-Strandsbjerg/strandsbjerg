@@ -1,6 +1,7 @@
 import { DiscAssessmentClient } from "@/app/disc/disc-assessment-client";
 import { requireUser } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
+import { ensureAssessmentResultShare } from "@/lib/disc-result-share";
 
 export const dynamic = "force-dynamic";
 
@@ -26,8 +27,33 @@ export default async function DiscAssessmentPage() {
       createdAt: true,
       submittedAt: true,
       rawResponses: true,
+      resultShare: {
+        select: {
+          token: true,
+        },
+      },
     },
   });
 
-  return <DiscAssessmentClient userId={user.id} assessments={assessments} hasCompanyDiscAccess={Boolean(companyMembership)} />;
+  const assessmentsWithShares = await Promise.all(
+    assessments.map(async (assessment) => {
+      if (assessment.status !== "SUBMITTED") {
+        return assessment;
+      }
+
+      if (assessment.resultShare?.token) {
+        return assessment;
+      }
+
+      const share = await ensureAssessmentResultShare(assessment.id);
+      return {
+        ...assessment,
+        resultShare: {
+          token: share.token,
+        },
+      };
+    }),
+  );
+
+  return <DiscAssessmentClient userId={user.id} assessments={assessmentsWithShares} hasCompanyDiscAccess={Boolean(companyMembership)} />;
 }
