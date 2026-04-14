@@ -63,26 +63,29 @@ export function InviteDiscClient({ token, candidateLabel, inviteState, latestAss
       const selectedOptionId = selectedOptionIdByQuestionId[question.id] ?? "";
       return selectedOptionId.length > 0 && question.options.some((option) => option.id === selectedOptionId);
     });
-  const responsesPayload = useMemo(
-    () =>
-      JSON.stringify(
-        questions
-          .map((question) => {
-            const selectedOptionId = selectedOptionIdByQuestionId[question.id] ?? "";
-            if (!currentSessionId || !selectedOptionId || !question.options.some((option) => option.id === selectedOptionId)) {
-              return null;
-            }
+  const responsesPayload = useMemo(() => {
+    const responses = questions
+      .map((question) => {
+        const selectedValue = selectedOptionIdByQuestionId[question.id] ?? "";
+        if (!currentSessionId || !selectedValue) {
+          return null;
+        }
 
-            return {
-              sessionId: currentSessionId,
-              questionId: question.id,
-              selectedOptionIds: [selectedOptionId],
-            };
-          })
-          .filter((response): response is { sessionId: string; questionId: string; selectedOptionIds: string[] } => response !== null),
-      ),
-    [currentSessionId, questions, selectedOptionIdByQuestionId],
-  );
+        const selectedOptionId = question.options.find((option) => option.id === selectedValue)?.id;
+        if (!selectedOptionId) {
+          return null;
+        }
+
+        return {
+          sessionId: currentSessionId,
+          questionId: question.id,
+          selectedOptionIds: [selectedOptionId],
+        };
+      })
+      .filter((response): response is { sessionId: string; questionId: string; selectedOptionIds: string[] } => response !== null);
+
+    return JSON.stringify(responses);
+  }, [currentSessionId, questions, selectedOptionIdByQuestionId]);
 
   const setSelectedOptionId = (question: DiscQuestion, optionId: string) => {
     setSelectedOptionIdByQuestionId((previous) => ({
@@ -171,7 +174,7 @@ export function InviteDiscClient({ token, candidateLabel, inviteState, latestAss
                       name={`question-${activeQuestion.id}`}
                       value={option.id}
                       checked={(selectedOptionIdByQuestionId[activeQuestion.id] ?? "") === option.id}
-                      onChange={(event) => setSelectedOptionId(activeQuestion, event.target.value)}
+                      onChange={() => setSelectedOptionId(activeQuestion, option.id)}
                     />
                     <span>{option.label}</span>
                   </label>
@@ -202,7 +205,26 @@ export function InviteDiscClient({ token, candidateLabel, inviteState, latestAss
         action={submitAction}
         className="space-y-3"
         onSubmit={() => {
-          console.log("DISC invite submit payload", responsesPayload);
+          const parsedResponses = JSON.parse(responsesPayload) as Array<{
+            sessionId: string;
+            questionId: string;
+            selectedOptionIds: string[];
+          }>;
+          console.log("DISC invite submit payload", parsedResponses);
+          console.table(
+            parsedResponses.map((response, index) => {
+              const question = questions.find((entry) => entry.id === response.questionId);
+              const selectedOptionId = response.selectedOptionIds[0] ?? "";
+              return {
+                index: index + 1,
+                hasSessionId: response.sessionId === currentSessionId,
+                hasQuestionId: Boolean(question),
+                selectedOptionIdsCount: response.selectedOptionIds.length,
+                selectedOptionInQuestionOptions: Boolean(question?.options.some((option) => option.id === selectedOptionId)),
+                selectedOptionId,
+              };
+            }),
+          );
         }}
       >
         <input type="hidden" name="token" value={token} />
