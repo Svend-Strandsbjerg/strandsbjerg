@@ -62,7 +62,7 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
   const [submitState, submitAction, submitting] = useActionState(submitDiscAssessmentResponses, initialDiscFlowState);
   const [selectedOptionIdByQuestionId, setSelectedOptionIdByQuestionId] = useState<Record<string, string>>({});
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
-  const [isSummaryStep, setIsSummaryStep] = useState(false);
+  const [hasEnteredFinalOverview, setHasEnteredFinalOverview] = useState(false);
   const [isAssessmentModalOpen, setIsAssessmentModalOpen] = useState(false);
   const [isStartModalOpen, setIsStartModalOpen] = useState(false);
   const [isTransitioningQuestion, setIsTransitioningQuestion] = useState(false);
@@ -73,7 +73,7 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
   const questions = startState.questions;
   const hasStartedSession = Boolean(currentSessionId);
   const hasQuestions = questions.length > 0;
-  const activeQuestion = hasQuestions && !isSummaryStep ? questions[Math.min(activeQuestionIndex, questions.length - 1)] : null;
+  const activeQuestion = hasQuestions ? questions[Math.min(activeQuestionIndex, questions.length - 1)] : null;
   const [isMobileTimelineOpen, setIsMobileTimelineOpen] = useState(false);
 
   const highestAnsweredQuestionIndex = useMemo(
@@ -135,7 +135,7 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
     if (startState.status === "success" && startState.sessionId && startState.questions.length > 0) {
       setIsAssessmentModalOpen(true);
       setActiveQuestionIndex(0);
-      setIsSummaryStep(false);
+      setHasEnteredFinalOverview(false);
       setSelectedOptionIdByQuestionId({});
       setIsCompletingAssessment(false);
     }
@@ -145,7 +145,7 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
     if (submitState.status === "success") {
       setIsCompletingAssessment(false);
       setIsAssessmentModalOpen(false);
-      setIsSummaryStep(false);
+      setHasEnteredFinalOverview(false);
       router.refresh();
     }
 
@@ -171,7 +171,7 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
 
     const isLastQuestion = activeQuestionIndex >= questions.length - 1;
     if (isLastQuestion) {
-      setIsSummaryStep(true);
+      setHasEnteredFinalOverview(true);
       return;
     }
 
@@ -179,9 +179,6 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
     window.setTimeout(() => {
       const nextIndex = Math.min(questions.length - 1, activeQuestionIndex + 1);
       setActiveQuestionIndex(nextIndex);
-      if (!nextAnswerMap[questions[nextIndex]?.id]) {
-        setIsSummaryStep(false);
-      }
       setIsTransitioningQuestion(false);
     }, QUESTION_ADVANCE_DELAY_MS);
   };
@@ -189,10 +186,16 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
   const progressPercent = hasQuestions ? (((Math.max(highestAnsweredQuestionIndex, activeQuestionIndex) + 1) / questions.length) * 100) : 0;
   const answeredCount = questions.filter((question) => Boolean(selectedOptionIdByQuestionId[question.id])).length;
   const isReadyForSubmit = hasQuestions && answeredCount === questions.length;
+  const isFinalOverviewVisible = hasEnteredFinalOverview && isReadyForSubmit;
+
+  useEffect(() => {
+    if (isReadyForSubmit) {
+      setHasEnteredFinalOverview(true);
+    }
+  }, [isReadyForSubmit]);
 
   const handleQuestionJump = (index: number) => {
     setActiveQuestionIndex(index);
-    setIsSummaryStep(false);
     setIsMobileTimelineOpen(false);
   };
 
@@ -356,52 +359,7 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
               ) : null}
             </div>
 
-            <div className={cn("grid min-h-0 flex-1 gap-6 md:items-start", isSummaryStep ? "md:grid-cols-[minmax(280px,360px)_120px_minmax(0,1fr)]" : "md:grid-cols-[120px_minmax(0,1fr)]")}>
-              {isSummaryStep ? (
-                <aside className="sticky top-8 hidden md:block">
-                  <p className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Afsluttende overblik</p>
-                  <div className="max-h-[calc(100vh-8rem)] overflow-auto rounded-2xl border border-border/60 bg-card/80 p-3">
-                    <div className="space-y-2">
-                      {questions.map((question, index) => {
-                        const selectedOptionId = selectedOptionIdByQuestionId[question.id] ?? "";
-                        const selectedOption = question.options.find((option) => option.id === selectedOptionId) ?? null;
-                        const selectedOptionIndex = question.options.findIndex((option) => option.id === selectedOptionId);
-
-                        return (
-                          <button
-                            key={question.id}
-                            type="button"
-                            onClick={() => handleQuestionJump(index)}
-                            className={cn(
-                              "w-full rounded-xl border px-3 py-2 text-left transition",
-                              index === activeQuestionIndex ? "border-foreground/50 bg-foreground/5" : "border-border/70 bg-background hover:border-foreground/30",
-                            )}
-                          >
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Spørgsmål {index + 1}</p>
-                            <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-foreground">{question.prompt}</p>
-                            <div className="mt-2 flex items-center gap-2 text-[11px]">
-                              {selectedOption ? (
-                                <>
-                                  <span
-                                    className={cn(
-                                      "inline-flex h-4 w-4 items-center justify-center rounded-full border",
-                                      selectedOptionIndex >= 0 ? LIKERT_NODE_TONES[selectedOptionIndex] : "border-border bg-muted",
-                                    )}
-                                  />
-                                  <span className="font-medium text-foreground">{selectedOption.label}</span>
-                                </>
-                              ) : (
-                                <span className="text-destructive">Mangler svar</span>
-                              )}
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </aside>
-              ) : null}
-
+            <div className="grid min-h-0 flex-1 gap-6 md:grid-cols-[120px_minmax(0,1fr)] md:items-start">
               <aside className="sticky top-8 hidden pr-2 md:block">
                 <p className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Oversigt</p>
                 <div className="rounded-2xl border border-border/60 bg-muted/10 p-3">
@@ -430,7 +388,7 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
               <div>
             <div className="mb-8 space-y-3">
               <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <span>{isSummaryStep ? "Afsluttende overblik" : `Spørgsmål ${activeQuestionIndex + 1} af ${questions.length}`}</span>
+                <span>{`Spørgsmål ${activeQuestionIndex + 1} af ${questions.length}`}</span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-muted">
                 <div className="h-full rounded-full bg-foreground/80 transition-all duration-300" style={{ width: `${progressPercent}%` }} />
@@ -438,59 +396,15 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
             </div>
 
             <div className={cn("mx-auto mt-8 w-full max-w-2xl rounded-3xl border border-border/80 bg-card p-6 shadow-sm transition-opacity duration-200 sm:p-10", isTransitioningQuestion && "opacity-0")}>
-              {isSummaryStep ? (
-                <div>
-                  <p className="text-xl font-semibold text-foreground sm:text-2xl">Gennemgå dine svar</p>
-                  <p className="mt-2 text-sm text-muted-foreground">Brug oversigten til venstre til at gennemgå svar, og luk derefter testen.</p>
-                  <div className="mt-6 space-y-2 md:hidden">
-                    {questions.map((question, index) => {
-                      const selectedOptionId = selectedOptionIdByQuestionId[question.id] ?? "";
-                      const selectedOption = question.options.find((option) => option.id === selectedOptionId) ?? null;
-                      const selectedOptionIndex = question.options.findIndex((option) => option.id === selectedOptionId);
-
-                      return (
-                        <button
-                          key={question.id}
-                          type="button"
-                          onClick={() => handleQuestionJump(index)}
-                          className={cn(
-                            "w-full rounded-xl border px-3 py-2 text-left transition",
-                            index === activeQuestionIndex ? "border-foreground/50 bg-foreground/5" : "border-border/70 bg-card hover:border-foreground/30",
-                          )}
-                        >
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Spørgsmål {index + 1}</p>
-                          <p className="mt-1 text-sm leading-relaxed text-foreground">{question.prompt}</p>
-                          <div className="mt-2 flex items-center gap-2 text-xs">
-                            {selectedOption ? (
-                              <>
-                                <span
-                                  className={cn(
-                                    "inline-flex h-4 w-4 items-center justify-center rounded-full border",
-                                    selectedOptionIndex >= 0 ? LIKERT_NODE_TONES[selectedOptionIndex] : "border-border bg-muted",
-                                  )}
-                                />
-                                <span className="font-medium text-foreground">{selectedOption.label}</span>
-                              </>
-                            ) : (
-                              <span className="text-destructive">Mangler svar</span>
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <div className="mt-8 flex justify-end">
-                    <Button type="button" onClick={handleCloseAssessment} disabled={!isReadyForSubmit || isCompletingAssessment || submitting}>
-                      {isCompletingAssessment || submitting ? "Gemmer..." : "Luk"}
-                    </Button>
-                  </div>
-                </div>
-              ) : activeQuestion ? (
+              {activeQuestion ? (
                 <>
-                  <p className="text-xl font-medium leading-relaxed text-foreground sm:text-2xl">{activeQuestion.prompt}</p>
+                  <div className="flex min-h-[24rem] flex-col">
+                    <div className="min-h-[7.5rem]">
+                      <p className="text-xl font-medium leading-relaxed text-foreground sm:text-2xl">{activeQuestion.prompt}</p>
+                    </div>
 
                   {activeQuestion.options.length > 0 ? (
-                <div className="mt-10 space-y-3">
+                <div className="mt-auto space-y-3 pt-10">
                   <div className="flex items-center justify-between text-xs text-muted-foreground sm:text-sm">
                     <span>{LIKERT_EDGE_LABELS.low}</span>
                     <span>{LIKERT_EDGE_LABELS.high}</span>
@@ -527,6 +441,7 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
               ) : (
                 <p className="mt-4 text-sm text-destructive">Question options are missing. Please restart your session.</p>
               )}
+                  </div>
                 </>
               ) : null}
               {isCompletingAssessment || submitting ? (
@@ -534,10 +449,68 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
                   <p>Processing your DISC profile...</p>
                   <p className="text-xs">Vi samler dine svar og gør resultatet klar.</p>
                 </div>
-              ) : !isSummaryStep ? (
+              ) : (
                 <p className="mt-8 text-sm text-muted-foreground">Vælg det svar der passer bedst — og gå videre.</p>
-              ) : null}
+              )}
             </div>
+
+            {isFinalOverviewVisible ? (
+              <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-start">
+                <div className="mx-auto w-full max-w-4xl">
+                  <p className="mb-3 text-center text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Afsluttende overblik</p>
+                  <div className="max-h-[45vh] overflow-auto rounded-2xl border border-border/60 bg-card/90 p-4 sm:p-5">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {questions.map((question, index) => {
+                        const selectedOptionId = selectedOptionIdByQuestionId[question.id] ?? "";
+                        const selectedOption = question.options.find((option) => option.id === selectedOptionId) ?? null;
+                        const selectedOptionIndex = question.options.findIndex((option) => option.id === selectedOptionId);
+
+                        return (
+                          <button
+                            key={question.id}
+                            type="button"
+                            onClick={() => handleQuestionJump(index)}
+                            className={cn(
+                              "w-full rounded-xl border px-3 py-3 text-left transition",
+                              index === activeQuestionIndex
+                                ? "border-foreground/55 bg-foreground/5 ring-2 ring-foreground/20 ring-offset-1 ring-offset-background"
+                                : "border-border/70 bg-background hover:border-foreground/35",
+                            )}
+                          >
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Spørgsmål {index + 1}</p>
+                            <p className="mt-1 text-xs leading-relaxed text-foreground">{question.prompt}</p>
+                            <div className="mt-3 flex items-center gap-2 text-xs">
+                              {selectedOption ? (
+                                <>
+                                  <span
+                                    className={cn(
+                                      "inline-flex h-5 w-5 items-center justify-center rounded-full border",
+                                      selectedOptionIndex >= 0 ? LIKERT_NODE_TONES[selectedOptionIndex] : "border-border bg-muted",
+                                    )}
+                                  />
+                                  <span className="font-medium text-foreground">{selectedOption.label}</span>
+                                </>
+                              ) : (
+                                <span className="text-destructive">Mangler svar</span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+                <aside className="rounded-2xl border border-border/70 bg-muted/20 p-4 lg:sticky lg:top-8">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Afslut test</p>
+                  <p className="mt-2 text-sm text-muted-foreground">Gennemgå dine svar i overblikket og luk testen, når du er tilfreds.</p>
+                  <div className="mt-4">
+                    <Button type="button" onClick={handleCloseAssessment} disabled={!isReadyForSubmit || isCompletingAssessment || submitting} className="w-full">
+                      {isCompletingAssessment || submitting ? "Gemmer..." : "Luk"}
+                    </Button>
+                  </div>
+                </aside>
+              </div>
+            ) : null}
               </div>
             </div>
           </div>
