@@ -27,6 +27,19 @@ export type SubmitDiscResponsesResponse = {
   [key: string]: unknown;
 };
 
+export type CompleteDiscSessionRequest = {
+  sessionId: string;
+};
+
+export type CompleteDiscSessionResponse = {
+  success?: boolean;
+  [key: string]: unknown;
+};
+
+export type GetDiscSessionResultResponse = {
+  [key: string]: unknown;
+};
+
 class DiscEngineError extends Error {
   constructor(
     message: string,
@@ -325,31 +338,16 @@ export async function createDiscSession(): Promise<CreateDiscSessionResponse> {
   };
 }
 
-export async function getDiscSessionQuestions(sessionId: string, sessionPayload?: unknown): Promise<DiscQuestion[]> {
+export async function getDiscSessionQuestions(sessionId: string): Promise<DiscQuestion[]> {
   if (!sessionId) {
     throw new DiscEngineError("Missing sessionId for question retrieval");
   }
 
-  const payloadQuestions = extractQuestionsFromPayload(sessionPayload);
-  if (payloadQuestions.length > 0) {
-    return payloadQuestions;
-  }
+  const result = await discEngineGetRequest<unknown>(`/sessions/${sessionId}/questions`);
+  const questions = extractQuestionsFromPayload(result);
 
-  const paths = [`/sessions/${sessionId}/questions`, `/questions?sessionId=${encodeURIComponent(sessionId)}`];
-
-  for (const path of paths) {
-    try {
-      const result = await discEngineGetRequest<unknown>(path);
-      const questions = extractQuestionsFromPayload(result);
-      if (questions.length > 0) {
-        return questions;
-      }
-    } catch (error) {
-      if (error instanceof DiscEngineError && error.status === 404) {
-        continue;
-      }
-      throw error;
-    }
+  if (questions.length > 0) {
+    return questions;
   }
 
   throw new DiscEngineError("No DISC question payload was returned for this session.");
@@ -372,6 +370,40 @@ export async function submitDiscResponses(input: SubmitDiscResponsesRequest): Pr
       sessionId: input.sessionId,
     });
     throw new DiscEngineError("disc-engine /responses returned an invalid payload");
+  }
+
+  return result;
+}
+
+export async function completeDiscSession(input: CompleteDiscSessionRequest): Promise<CompleteDiscSessionResponse> {
+  if (!input.sessionId) {
+    throw new DiscEngineError("Missing sessionId for completion");
+  }
+
+  const result = await discEngineRequest<CompleteDiscSessionResponse>(`/sessions/${input.sessionId}/complete`, {
+    sessionId: input.sessionId,
+  });
+
+  if (!result || typeof result !== "object") {
+    logServerEvent("error", "disc_engine_malformed_complete_response", {
+      sessionId: input.sessionId,
+    });
+    throw new DiscEngineError("disc-engine completion endpoint returned an invalid payload");
+  }
+
+  return result;
+}
+
+export async function getDiscSessionResult(sessionId: string): Promise<GetDiscSessionResultResponse> {
+  if (!sessionId) {
+    throw new DiscEngineError("Missing sessionId for result retrieval");
+  }
+
+  const result = await discEngineGetRequest<GetDiscSessionResultResponse>(`/sessions/${sessionId}/result`);
+
+  if (!result || typeof result !== "object") {
+    logServerEvent("error", "disc_engine_malformed_result_response", { sessionId });
+    throw new DiscEngineError("disc-engine result endpoint returned an invalid payload");
   }
 
   return result;
