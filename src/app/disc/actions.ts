@@ -1,11 +1,20 @@
 "use server";
 
 import { cookies } from "next/headers";
+import type { Prisma } from "@prisma/client";
 
 import type { DiscFlowState } from "@/app/disc/action-state";
 import { auth } from "@/lib/auth";
 import { createDiscAssessmentRecord, markDiscAssessmentSubmitted } from "@/lib/disc-assessment";
-import { DiscEngineError, createDiscSession, getDiscSessionQuestions, submitDiscResponses, validateDiscResponses } from "@/lib/disc-engine";
+import {
+  DiscEngineError,
+  completeDiscSession,
+  createDiscSession,
+  getDiscSessionQuestions,
+  getDiscSessionResult,
+  submitDiscResponses,
+  validateDiscResponses,
+} from "@/lib/disc-engine";
 import { logServerEvent } from "@/lib/logger";
 import { enforceRateLimit } from "@/lib/rate-limit";
 
@@ -59,7 +68,7 @@ export async function startDiscAssessment(_: DiscFlowState): Promise<DiscFlowSta
 
   try {
     const createdSession = await createDiscSession();
-    const questions = await getDiscSessionQuestions(createdSession.sessionId, createdSession);
+    const questions = await getDiscSessionQuestions(createdSession.sessionId);
     await createDiscAssessmentRecord({
       externalSessionId: createdSession.sessionId,
       userId: session?.user?.id ?? null,
@@ -172,9 +181,15 @@ export async function submitDiscAssessmentResponses(_: DiscFlowState, formData: 
       sessionId,
       responses: validatedResponses,
     });
+    await completeDiscSession({ sessionId });
+    const resultPayload = await getDiscSessionResult(sessionId);
+    const persistedPayload = {
+      responses: validatedResponses,
+      result: JSON.parse(JSON.stringify(resultPayload)) as Prisma.InputJsonValue,
+    } satisfies Prisma.InputJsonValue;
     await markDiscAssessmentSubmitted({
       externalSessionId: sessionId,
-      rawResponses: validatedResponses,
+      rawResponses: persistedPayload,
     });
 
     cookieStore.set(DISC_SUBMITTED_COOKIE, sessionId, {

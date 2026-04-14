@@ -2,9 +2,19 @@
 
 import { revalidatePath } from "next/cache";
 import { AssessmentInviteStatus } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 
 import { createDiscAssessmentRecord, markDiscAssessmentSubmitted } from "@/lib/disc-assessment";
-import { DiscEngineError, createDiscSession, submitDiscResponses, validateDiscResponses } from "@/lib/disc-engine";
+import type { DiscQuestion } from "@/lib/disc-types";
+import {
+  DiscEngineError,
+  completeDiscSession,
+  createDiscSession,
+  getDiscSessionQuestions,
+  getDiscSessionResult,
+  submitDiscResponses,
+  validateDiscResponses,
+} from "@/lib/disc-engine";
 import { getInviteAccessState } from "@/lib/disc-invites";
 import { logServerEvent } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
@@ -14,12 +24,14 @@ export type InviteDiscState = {
   status: "idle" | "success" | "error";
   message: string;
   sessionId: string;
+  questions: DiscQuestion[];
 };
 
 export const initialInviteDiscState: InviteDiscState = {
   status: "idle",
   message: "",
   sessionId: "",
+  questions: [],
 };
 
 function toErrorMessage(error: unknown, fallback: string) {
@@ -59,7 +71,7 @@ export async function startInviteDiscAssessment(_: InviteDiscState, formData: Fo
   const token = String(formData.get("token") ?? "").trim();
 
   if (!token) {
-    return { status: "error", message: "Invalid invite token.", sessionId: "" };
+    return { status: "error", message: "Invalid invite token.", sessionId: "", questions: [] };
   }
 
   const rateLimit = enforceRateLimit({
@@ -68,7 +80,7 @@ export async function startInviteDiscAssessment(_: InviteDiscState, formData: Fo
     windowMs: 60_000,
   });
   if (!rateLimit.ok) {
-    return { status: "error", message: "Too many attempts. Please wait a minute and try again.", sessionId: "" };
+    return { status: "error", message: "Too many attempts. Please wait a minute and try again.", sessionId: "", questions: [] };
   }
 
   try {
@@ -87,10 +99,12 @@ export async function startInviteDiscAssessment(_: InviteDiscState, formData: Fo
         status: "success",
         message: "Existing session restored.",
         sessionId: existingAssessment.externalSessionId,
+        questions: await getDiscSessionQuestions(existingAssessment.externalSessionId),
       };
     }
 
     const createdSession = await createDiscSession();
+    const questions = await getDiscSessionQuestions(createdSession.sessionId);
     await createDiscAssessmentRecord({
       externalSessionId: createdSession.sessionId,
       inviteId: invite.id,
@@ -103,6 +117,7 @@ export async function startInviteDiscAssessment(_: InviteDiscState, formData: Fo
       status: "success",
       message: "DISC session created.",
       sessionId: createdSession.sessionId,
+      questions,
     };
   } catch (error) {
     logServerEvent("error", "disc_invite_start_failed", {
@@ -115,6 +130,7 @@ export async function startInviteDiscAssessment(_: InviteDiscState, formData: Fo
         status: "error",
         message: "This invite is invalid, expired, or already completed.",
         sessionId: "",
+        questions: [],
       };
     }
 
@@ -122,6 +138,7 @@ export async function startInviteDiscAssessment(_: InviteDiscState, formData: Fo
       status: "error",
       message: toErrorMessage(error, "Unable to start the DISC assessment right now. Please try again shortly."),
       sessionId: "",
+      questions: [],
     };
   }
 }
@@ -132,7 +149,7 @@ export async function submitInviteDiscAssessment(_: InviteDiscState, formData: F
   const responsesRaw = String(formData.get("responses") ?? "").trim();
 
   if (!token || !sessionId) {
-    return { status: "error", message: "Invalid submission request.", sessionId: "" };
+    return { status: "error", message: "Invalid submission request.", sessionId: "", questions: [] };
   }
 
   const rateLimit = enforceRateLimit({
@@ -142,7 +159,7 @@ export async function submitInviteDiscAssessment(_: InviteDiscState, formData: F
   });
 
   if (!rateLimit.ok) {
-    return { status: "error", message: "Too many submission attempts. Please wait before trying again.", sessionId };
+    return { status: "error", message: "Too many submission attempts. Please wait before trying again.", sessionId, questions: [] };
   }
 
   let parsedResponses: unknown;
@@ -150,14 +167,14 @@ export async function submitInviteDiscAssessment(_: InviteDiscState, formData: F
   try {
     parsedResponses = JSON.parse(responsesRaw);
   } catch {
-    return { status: "error", message: "Responses must be valid JSON.", sessionId };
+    return { status: "error", message: "Responses must be valid JSON.", sessionId, questions: [] };
   }
 
   let validatedResponses;
   try {
     validatedResponses = validateDiscResponses(parsedResponses);
   } catch (error) {
-    return { status: "error", message: toErrorMessage(error, "Responses are invalid."), sessionId };
+    return { status: "error", message: toErrorMessage(error, "Responses are invalid."), sessionId, questions: [] };
   }
 
   try {
@@ -171,11 +188,20 @@ export async function submitInviteDiscAssessment(_: InviteDiscState, formData: F
     });
 
     if (!matchingAssessment || matchingAssessment.status !== "STARTED") {
-      return { status: "error", message: "Session does not match invite or is already submitted.", sessionId };
+      return { status: "error", message: "Session does not match invite or is already submitted.", sessionId, questions: [] };
     }
 
     await submitDiscResponses({ sessionId, responses: validatedResponses });
-    await markDiscAssessmentSubmitted({ externalSessionId: sessionId, rawResponses: validatedResponses });
+    await completeDiscSession({ sessionId });
+    const resultPayload = await getDiscSessionResult(sessionId);
+    const persistedPayload = {
+      responses: validatedResponses,
+      result: JSON.parse(JSON.stringify(resultPayload)) as Prisma.InputJsonValue,
+    } satisfies Prisma.InputJsonValue;
+    await markDiscAssessmentSubmitted({
+      externalSessionId: sessionId,
+      rawResponses: persistedPayload,
+    });
 
     await prisma.assessmentInvite.updateMany({
       where: { id: invite.id, status: AssessmentInviteStatus.ACTIVE },
@@ -201,7 +227,7 @@ export async function submitInviteDiscAssessment(_: InviteDiscState, formData: F
 
     revalidatePath(`/disc/invite/${token}`);
 
-    return { status: "success", message: "Responses submitted successfully.", sessionId };
+    return { status: "success", message: "Responses submitted successfully.", sessionId, questions: [] };
   } catch (error) {
     logServerEvent("error", "disc_invite_submit_failed", {
       inviteToken: token,
@@ -213,6 +239,7 @@ export async function submitInviteDiscAssessment(_: InviteDiscState, formData: F
       status: "error",
       message: toErrorMessage(error, "Unable to submit responses right now."),
       sessionId,
+      questions: [],
     };
   }
 }
