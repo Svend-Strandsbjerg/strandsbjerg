@@ -200,62 +200,91 @@ function normalizeDimensionScoresFromRecord(record: Record<string, unknown>): Di
   return hasSignal ? scores : null;
 }
 
-function extractEngineDimensionScores(rawResponses: unknown): DimensionScores | null {
-  const canonicalResult = extractCanonicalResult(rawResponses);
-  if (!canonicalResult) {
+function mergeDimensionScores(target: DimensionScores, source: DimensionScores) {
+  for (const dimension of ["D", "I", "S", "C"] as const) {
+    target[dimension] = source[dimension];
+  }
+}
+
+function extractDimensionFromEntry(entry: Record<string, unknown>) {
+  return normalizeToDiscDimension(entry.dimension ?? entry.discDimension ?? entry.trait ?? entry.code ?? entry.name);
+}
+
+function extractScoreFromEntry(entry: Record<string, unknown>) {
+  return toNumber(entry.score ?? entry.value ?? entry.normalizedScore ?? entry.percentage ?? entry.count ?? entry.rawScore);
+}
+
+function collectDimensionScores(value: unknown, depth = 0): DimensionScores | null {
+  if (depth > 6) {
     return null;
   }
 
-  const dimensionsObject = toObject(canonicalResult.normalizedDimensions) ?? toObject(canonicalResult.dimensions);
-  if (dimensionsObject) {
-    const directScores = normalizeDimensionScoresFromRecord(dimensionsObject);
+  const fromRecord = toObject(value);
+  if (fromRecord) {
+    const directScores = normalizeDimensionScoresFromRecord(fromRecord);
     if (directScores) {
       return directScores;
     }
 
-    const normalized: DimensionScores = { D: 0, I: 0, S: 0, C: 0 };
+    const dimension = extractDimensionFromEntry(fromRecord);
+    const score = extractScoreFromEntry(fromRecord);
+    if (dimension && score !== null) {
+      return { D: dimension === "D" ? score : 0, I: dimension === "I" ? score : 0, S: dimension === "S" ? score : 0, C: dimension === "C" ? score : 0 };
+    }
+
+    const aggregate: DimensionScores = { D: 0, I: 0, S: 0, C: 0 };
     let hasSignal = false;
 
-    for (const value of Object.values(dimensionsObject)) {
-      const entry = toObject(value);
-      if (!entry) {
-        continue;
-      }
-
-      const dimension = normalizeToDiscDimension(entry.dimension ?? entry.code ?? entry.name);
-      const score = toNumber(entry.score ?? entry.value ?? entry.normalizedScore ?? entry.percentage);
-
-      if (dimension && score !== null) {
-        normalized[dimension] = score;
+    for (const key of ["dimensions", "normalizedDimensions", "scores", "signals", "discSignals", "dimensionScores", "result"] as const) {
+      const nested = collectDimensionScores(fromRecord[key], depth + 1);
+      if (nested) {
+        mergeDimensionScores(aggregate, nested);
         hasSignal = true;
       }
     }
 
-    if (hasSignal) {
-      return normalized;
+    if (!hasSignal) {
+      for (const nestedValue of Object.values(fromRecord)) {
+        const nested = collectDimensionScores(nestedValue, depth + 1);
+        if (nested) {
+          mergeDimensionScores(aggregate, nested);
+          hasSignal = true;
+        }
+      }
     }
+
+    return hasSignal ? aggregate : null;
   }
 
-  if (Array.isArray(canonicalResult.dimensions)) {
-    const normalized: DimensionScores = { D: 0, I: 0, S: 0, C: 0 };
+  if (Array.isArray(value)) {
+    const aggregate: DimensionScores = { D: 0, I: 0, S: 0, C: 0 };
     let hasSignal = false;
 
-    for (const value of canonicalResult.dimensions) {
-      const entry = toObject(value);
-      if (!entry) {
+    for (const entry of value) {
+      const nested = collectDimensionScores(entry, depth + 1);
+      if (!nested) {
         continue;
       }
 
-      const dimension = normalizeToDiscDimension(entry.dimension ?? entry.code ?? entry.name);
-      const score = toNumber(entry.score ?? entry.value ?? entry.normalizedScore ?? entry.percentage);
-      if (dimension && score !== null) {
-        normalized[dimension] = score;
-        hasSignal = true;
-      }
+      mergeDimensionScores(aggregate, nested);
+      hasSignal = true;
     }
 
-    if (hasSignal) {
-      return normalized;
+    return hasSignal ? aggregate : null;
+  }
+
+  return null;
+}
+
+function extractEngineDimensionScores(rawResponses: unknown): DimensionScores | null {
+  const canonicalResult = extractCanonicalResult(rawResponses);
+  const enginePayload = extractEngineResult(rawResponses);
+  const candidates: unknown[] = [canonicalResult?.normalizedDimensions, canonicalResult?.dimensions, canonicalResult, enginePayload];
+
+  for (const candidate of candidates) {
+    const scores = collectDimensionScores(candidate);
+    if (scores) {
+      return scores;
     }
   }
 
@@ -291,14 +320,14 @@ export function extractInterpretationText(rawResponses: unknown) {
 export function buildDiscInsights(rawResponses: unknown) {
   const records = normalizeResponseRecords(rawResponses);
   const canonicalResult = extractCanonicalResult(rawResponses);
-  const mappedDimensions = extractEngineDimensionScores(rawResponses);
-  const dimensionCounts = mappedDimensions ?? extractDimensionCounts(records);
+  const dimensionCounts = extractEngineDimensionScores(rawResponses) ?? extractDimensionCounts(records);
   const qualityIndicators = canonicalResult?.qualityIndicators ?? null;
   const rankedDimensions = (Object.entries(dimensionCounts) as Array<[DiscDimension, number]>).sort((a, b) => b[1] - a[1]);
   const mappedPrimaryDimension = normalizeToDiscDimension(canonicalResult?.primaryDimension);
   const mappedSecondaryDimension = normalizeToDiscDimension(canonicalResult?.secondaryDimension);
   const dominantDimension = mappedPrimaryDimension ?? (rankedDimensions[0]?.[1] > 0 ? rankedDimensions[0][0] : null);
-  const secondaryDimension = mappedSecondaryDimension ?? (rankedDimensions[1]?.[1] > 0 ? rankedDimensions[1][0] : null);
+  const rankedSecondary = rankedDimensions.find(([dimension, score]) => dimension !== dominantDimension && score > 0)?.[0] ?? null;
+  const secondaryDimension = mappedSecondaryDimension ?? rankedSecondary;
 
   return {
     records,
