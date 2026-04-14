@@ -45,6 +45,14 @@ const LIKERT_TONES = [
   "from-emerald-100 to-emerald-200 border-emerald-300 text-emerald-900",
 ] as const;
 
+const LIKERT_NODE_TONES = [
+  "border-rose-400/70 bg-rose-500/85 text-white dark:border-rose-300/70 dark:bg-rose-400/90 dark:text-slate-950",
+  "border-amber-400/80 bg-amber-500/90 text-white dark:border-amber-300/70 dark:bg-amber-400/90 dark:text-slate-950",
+  "border-slate-400/80 bg-slate-500/90 text-white dark:border-slate-300/80 dark:bg-slate-300/90 dark:text-slate-950",
+  "border-sky-400/80 bg-sky-500/90 text-white dark:border-sky-300/70 dark:bg-sky-400/90 dark:text-slate-950",
+  "border-emerald-400/80 bg-emerald-500/90 text-white dark:border-emerald-300/70 dark:bg-emerald-400/90 dark:text-slate-950",
+] as const;
+
 const QUESTION_ADVANCE_DELAY_MS = 180;
 const COMPLETION_TRANSITION_DELAY_MS = 250;
 
@@ -54,7 +62,6 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
   const [submitState, submitAction, submitting] = useActionState(submitDiscAssessmentResponses, initialDiscFlowState);
   const [selectedOptionIdByQuestionId, setSelectedOptionIdByQuestionId] = useState<Record<string, string>>({});
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
-  const [furthestReachedQuestionIndex, setFurthestReachedQuestionIndex] = useState(0);
   const [isSummaryStep, setIsSummaryStep] = useState(false);
   const [isAssessmentModalOpen, setIsAssessmentModalOpen] = useState(false);
   const [isStartModalOpen, setIsStartModalOpen] = useState(false);
@@ -69,26 +76,36 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
   const activeQuestion = hasQuestions && !isSummaryStep ? questions[Math.min(activeQuestionIndex, questions.length - 1)] : null;
   const [isMobileTimelineOpen, setIsMobileTimelineOpen] = useState(false);
 
+  const highestAnsweredQuestionIndex = useMemo(
+    () =>
+      questions.reduce((highestIndex, question, index) => {
+        if (selectedOptionIdByQuestionId[question.id]) {
+          return Math.max(highestIndex, index);
+        }
+
+        return highestIndex;
+      }, -1),
+    [questions, selectedOptionIdByQuestionId],
+  );
+
   const timelineItems = useMemo(() => {
     return questions
       .map((question, index) => {
         const answerId = selectedOptionIdByQuestionId[question.id] ?? "";
         const isCurrent = index === activeQuestionIndex;
         const isAnswered = Boolean(answerId);
-        const shouldShow = index <= furthestReachedQuestionIndex || isCurrent;
-        if (!shouldShow) {
-          return null;
-        }
+        const optionIndex = question.options.findIndex((option) => option.id === answerId);
 
         return {
           questionId: question.id,
           index,
           isCurrent,
           isAnswered,
+          selectedOptionIndex: optionIndex >= 0 ? optionIndex : null,
         };
       })
-      .filter((item): item is { questionId: string; index: number; isCurrent: boolean; isAnswered: boolean } => item !== null);
-  }, [activeQuestionIndex, furthestReachedQuestionIndex, questions, selectedOptionIdByQuestionId]);
+      .filter((item): item is { questionId: string; index: number; isCurrent: boolean; isAnswered: boolean; selectedOptionIndex: number | null } => item !== null);
+  }, [activeQuestionIndex, questions, selectedOptionIdByQuestionId]);
 
   const responsesPayload = useMemo(() => {
     const responses = questions
@@ -118,7 +135,6 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
     if (startState.status === "success" && startState.sessionId && startState.questions.length > 0) {
       setIsAssessmentModalOpen(true);
       setActiveQuestionIndex(0);
-      setFurthestReachedQuestionIndex(0);
       setIsSummaryStep(false);
       setSelectedOptionIdByQuestionId({});
       setIsCompletingAssessment(false);
@@ -155,7 +171,6 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
 
     const isLastQuestion = activeQuestionIndex >= questions.length - 1;
     if (isLastQuestion) {
-      setFurthestReachedQuestionIndex(questions.length - 1);
       setIsSummaryStep(true);
       return;
     }
@@ -164,7 +179,6 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
     window.setTimeout(() => {
       const nextIndex = Math.min(questions.length - 1, activeQuestionIndex + 1);
       setActiveQuestionIndex(nextIndex);
-      setFurthestReachedQuestionIndex((previous) => Math.max(previous, nextIndex));
       if (!nextAnswerMap[questions[nextIndex]?.id]) {
         setIsSummaryStep(false);
       }
@@ -172,7 +186,7 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
     }, QUESTION_ADVANCE_DELAY_MS);
   };
 
-  const progressPercent = hasQuestions ? (((furthestReachedQuestionIndex + 1) / questions.length) * 100) : 0;
+  const progressPercent = hasQuestions ? (((Math.max(highestAnsweredQuestionIndex, activeQuestionIndex) + 1) / questions.length) * 100) : 0;
   const answeredCount = questions.filter((question) => Boolean(selectedOptionIdByQuestionId[question.id])).length;
   const isReadyForSubmit = hasQuestions && answeredCount === questions.length;
 
@@ -321,56 +335,95 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
                 <span className="text-xs text-muted-foreground">{answeredCount}/{questions.length}</span>
               </button>
               {isMobileTimelineOpen ? (
-                <div className="mt-3 grid grid-cols-4 gap-2">
+                <div className="mt-3 grid grid-cols-6 gap-2">
                   {timelineItems.map((item) => (
                     <button
                       key={item.questionId}
                       type="button"
                       onClick={() => handleQuestionJump(item.index)}
-                      disabled={!item.isAnswered && !item.isCurrent}
                       className={cn(
-                        "w-full rounded-lg border px-2 py-2 text-center text-[11px] transition",
-                        item.isCurrent ? "border-foreground/45 bg-foreground/5 text-foreground" : "border-border/60 bg-card text-muted-foreground hover:text-foreground",
+                        "relative flex h-9 w-full items-center justify-center rounded-lg border text-[11px] font-semibold transition",
+                        item.isAnswered && item.selectedOptionIndex !== null
+                          ? LIKERT_NODE_TONES[item.selectedOptionIndex] ?? LIKERT_NODE_TONES[2]
+                          : "border-border/70 bg-card/80 text-muted-foreground hover:text-foreground",
+                        item.isCurrent ? "ring-2 ring-foreground/65 ring-offset-1 ring-offset-background" : "",
                       )}
                     >
-                      <span>{item.index + 1}</span>
+                      {item.index + 1}
                     </button>
                   ))}
                 </div>
               ) : null}
             </div>
 
-            <div className="grid min-h-0 flex-1 gap-8 md:grid-cols-[240px_minmax(0,1fr)] md:items-start">
+            <div className={cn("grid min-h-0 flex-1 gap-6 md:items-start", isSummaryStep ? "md:grid-cols-[minmax(280px,360px)_120px_minmax(0,1fr)]" : "md:grid-cols-[120px_minmax(0,1fr)]")}>
+              {isSummaryStep ? (
+                <aside className="sticky top-8 hidden md:block">
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Afsluttende overblik</p>
+                  <div className="max-h-[calc(100vh-8rem)] overflow-auto rounded-2xl border border-border/60 bg-card/80 p-3">
+                    <div className="space-y-2">
+                      {questions.map((question, index) => {
+                        const selectedOptionId = selectedOptionIdByQuestionId[question.id] ?? "";
+                        const selectedOption = question.options.find((option) => option.id === selectedOptionId) ?? null;
+                        const selectedOptionIndex = question.options.findIndex((option) => option.id === selectedOptionId);
+
+                        return (
+                          <button
+                            key={question.id}
+                            type="button"
+                            onClick={() => handleQuestionJump(index)}
+                            className={cn(
+                              "w-full rounded-xl border px-3 py-2 text-left transition",
+                              index === activeQuestionIndex ? "border-foreground/50 bg-foreground/5" : "border-border/70 bg-background hover:border-foreground/30",
+                            )}
+                          >
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Spørgsmål {index + 1}</p>
+                            <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-foreground">{question.prompt}</p>
+                            <div className="mt-2 flex items-center gap-2 text-[11px]">
+                              {selectedOption ? (
+                                <>
+                                  <span
+                                    className={cn(
+                                      "inline-flex h-4 w-4 items-center justify-center rounded-full border",
+                                      selectedOptionIndex >= 0 ? LIKERT_NODE_TONES[selectedOptionIndex] : "border-border bg-muted",
+                                    )}
+                                  />
+                                  <span className="font-medium text-foreground">{selectedOption.label}</span>
+                                </>
+                              ) : (
+                                <span className="text-destructive">Mangler svar</span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </aside>
+              ) : null}
+
               <aside className="sticky top-8 hidden pr-2 md:block">
                 <p className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Oversigt</p>
                 <div className="rounded-2xl border border-border/60 bg-muted/10 p-3">
-                  <p className="mb-3 text-[11px] text-muted-foreground">{answeredCount} af {questions.length} besvaret</p>
-                  <div className="grid grid-cols-4 gap-2">
+                  <p className="mb-3 text-[11px] text-muted-foreground">Viser {activeQuestionIndex + 1} · Progress {Math.max(highestAnsweredQuestionIndex + 1, 0)}/{questions.length}</p>
+                  <div className="grid grid-cols-2 gap-2">
                     {timelineItems.map((item) => (
-                    <button
-                      key={item.questionId}
-                      type="button"
-                      onClick={() => handleQuestionJump(item.index)}
-                      disabled={!item.isAnswered && !item.isCurrent}
-                      className={cn(
-                        "flex h-9 items-center justify-center rounded-lg border text-xs font-medium transition",
-                        item.isCurrent ? "border-foreground/45 bg-foreground/5 text-foreground" : "border-border/60 bg-card text-muted-foreground hover:text-foreground",
-                        item.isAnswered ? "" : "opacity-70",
-                      )}
-                    >
-                      {item.index + 1}
-                    </button>
-                  ))}
+                      <button
+                        key={item.questionId}
+                        type="button"
+                        onClick={() => handleQuestionJump(item.index)}
+                        className={cn(
+                          "relative flex h-9 items-center justify-center rounded-lg border text-xs font-semibold transition",
+                          item.isAnswered && item.selectedOptionIndex !== null
+                            ? LIKERT_NODE_TONES[item.selectedOptionIndex] ?? LIKERT_NODE_TONES[2]
+                            : "border-border/70 bg-card text-muted-foreground hover:text-foreground",
+                          item.isCurrent ? "ring-2 ring-foreground/65 ring-offset-1 ring-offset-background" : "",
+                        )}
+                      >
+                        {item.index + 1}
+                      </button>
+                    ))}
                   </div>
-                  {furthestReachedQuestionIndex > activeQuestionIndex ? (
-                    <button
-                      type="button"
-                      onClick={() => handleQuestionJump(furthestReachedQuestionIndex)}
-                      className="mt-3 text-xs font-medium text-foreground/80 hover:text-foreground"
-                    >
-                      Tilbage til spørgsmål {furthestReachedQuestionIndex + 1}
-                    </button>
-                  ) : null}
                 </div>
               </aside>
 
@@ -388,24 +441,40 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
               {isSummaryStep ? (
                 <div>
                   <p className="text-xl font-semibold text-foreground sm:text-2xl">Gennemgå dine svar</p>
-                  <p className="mt-2 text-sm text-muted-foreground">Du kan hurtigt kontrollere alle svar, før du afslutter testen.</p>
-                  <div className="mt-6 space-y-2">
+                  <p className="mt-2 text-sm text-muted-foreground">Brug oversigten til venstre til at gennemgå svar, og luk derefter testen.</p>
+                  <div className="mt-6 space-y-2 md:hidden">
                     {questions.map((question, index) => {
-                      const isAnswered = Boolean(selectedOptionIdByQuestionId[question.id]);
+                      const selectedOptionId = selectedOptionIdByQuestionId[question.id] ?? "";
+                      const selectedOption = question.options.find((option) => option.id === selectedOptionId) ?? null;
+                      const selectedOptionIndex = question.options.findIndex((option) => option.id === selectedOptionId);
+
                       return (
                         <button
                           key={question.id}
                           type="button"
                           onClick={() => handleQuestionJump(index)}
                           className={cn(
-                            "flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left text-sm transition",
-                            isAnswered ? "border-border/70 bg-card hover:border-foreground/30" : "border-destructive/40 bg-destructive/5",
+                            "w-full rounded-xl border px-3 py-2 text-left transition",
+                            index === activeQuestionIndex ? "border-foreground/50 bg-foreground/5" : "border-border/70 bg-card hover:border-foreground/30",
                           )}
                         >
-                          <span>Spørgsmål {index + 1}</span>
-                          <span className={cn("text-xs", isAnswered ? "text-emerald-700 dark:text-emerald-300" : "text-destructive")}>
-                            {isAnswered ? "Besvaret" : "Mangler svar"}
-                          </span>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Spørgsmål {index + 1}</p>
+                          <p className="mt-1 text-sm leading-relaxed text-foreground">{question.prompt}</p>
+                          <div className="mt-2 flex items-center gap-2 text-xs">
+                            {selectedOption ? (
+                              <>
+                                <span
+                                  className={cn(
+                                    "inline-flex h-4 w-4 items-center justify-center rounded-full border",
+                                    selectedOptionIndex >= 0 ? LIKERT_NODE_TONES[selectedOptionIndex] : "border-border bg-muted",
+                                  )}
+                                />
+                                <span className="font-medium text-foreground">{selectedOption.label}</span>
+                              </>
+                            ) : (
+                              <span className="text-destructive">Mangler svar</span>
+                            )}
+                          </div>
                         </button>
                       );
                     })}
@@ -439,13 +508,17 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
                             "bg-gradient-to-b hover:-translate-y-0.5 dark:opacity-90",
                             LIKERT_TONES[index] ?? LIKERT_TONES[2],
                             selected
-                              ? "border-foreground/60 ring-2 ring-foreground/55 shadow-[0_0_0_1px_rgba(15,23,42,0.08)] dark:shadow-[0_0_0_1px_rgba(148,163,184,0.18)]"
+                              ? "border-foreground ring-2 ring-foreground/80 shadow-[0_0_0_2px_rgba(15,23,42,0.15)] dark:shadow-[0_0_0_2px_rgba(248,250,252,0.25)]"
                               : "opacity-90 hover:opacity-100",
                           )}
                           aria-label={`${index + 1}. ${option.label}`}
                         >
                           <span className="sr-only">{option.label}</span>
-                          {selected ? <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-foreground/85" /> : null}
+                          {selected ? (
+                            <span className="absolute right-2 top-2 inline-flex h-4 w-4 items-center justify-center rounded-full border border-foreground/40 bg-background/85">
+                              <span className="h-2 w-2 rounded-full bg-foreground/90" />
+                            </span>
+                          ) : null}
                         </button>
                       );
                     })}
