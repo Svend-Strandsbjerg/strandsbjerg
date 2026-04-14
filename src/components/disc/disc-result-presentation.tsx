@@ -1,4 +1,4 @@
-import { buildDiscResultViewModel, deriveDiscPlacement } from "@/lib/disc-result-insights";
+import { buildDiscProfileSummary, buildDiscResultViewModel, deriveDiscPlacement } from "@/lib/disc-result-insights";
 import { cn } from "@/lib/utils";
 
 type DiscResultPresentationProps = {
@@ -27,22 +27,6 @@ function formatDate(value: Date | null) {
   }).format(value);
 }
 
-function renderValue(value: unknown) {
-  if (value === null || value === undefined) {
-    return "—";
-  }
-
-  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-    return String(value);
-  }
-
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
-  }
-}
-
 function formatDimensionValue(value: number | null) {
   if (value === null) {
     return "—";
@@ -57,7 +41,7 @@ function formatPercent(value: number) {
 
 function DiscSquare({ x, y }: { x: number; y: number }) {
   return (
-    <div className="mx-auto w-full max-w-[25rem]">
+    <div className="mx-auto w-full max-w-[22rem]">
       <div className="relative aspect-square overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm">
         <div className="absolute inset-0 grid grid-cols-2 grid-rows-2">
           <div className="border-b border-r border-border/60 bg-red-500/20 p-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-red-900">D</div>
@@ -78,14 +62,6 @@ function DiscSquare({ x, y }: { x: number; y: number }) {
           aria-label="DISC placement marker"
         />
       </div>
-      <div className="mt-2 flex items-center justify-between text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-        <span>Reserveret</span>
-        <span>Udadvendt</span>
-      </div>
-      <div className="mt-1 flex items-center justify-between text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-        <span>Struktureret</span>
-        <span>Handlingsorienteret</span>
-      </div>
     </div>
   );
 }
@@ -104,28 +80,9 @@ export function DiscResultPresentation({
   pdfHref,
 }: DiscResultPresentationProps) {
   const viewModel = buildDiscResultViewModel(rawResponses);
+  const profileSummary = buildDiscProfileSummary(viewModel);
   const placement = deriveDiscPlacement(viewModel.dimensionScores);
   const completionDate = submittedAt ?? (status === "SUBMITTED" ? createdAt : null);
-  const qualityIndicatorEntries = Object.entries(viewModel.qualityIndicators);
-
-  const renderedViewModel = {
-    status,
-    dimensions: viewModel.dimensionScores,
-    primaryDimension: viewModel.primaryDimension,
-    secondaryDimension: viewModel.secondaryDimension,
-    lifecycleStatus: viewModel.lifecycleStatus,
-    profileSummary: viewModel.profileSummary,
-    qualityIndicatorKeys: qualityIndicatorEntries.map(([key]) => key),
-  };
-
-  console.info(
-    JSON.stringify({
-      event: "disc_result_render_payload",
-      rawEngineResultPayload: rawResponses,
-      mappedViewModel: renderedViewModel,
-      hasEngineResult: Boolean(viewModel.canonicalResult),
-    }),
-  );
 
   if (status !== "SUBMITTED") {
     return (
@@ -150,63 +107,30 @@ export function DiscResultPresentation({
       <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
         <h3 className="text-lg font-semibold tracking-tight">{title}</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          {identityLabel ? `${identityLabel} · ` : ""}Completed on {formatDate(completionDate)} · Status: {status.toLowerCase()}
+          {identityLabel ? `${identityLabel} · ` : ""}Completed on {formatDate(completionDate)}
         </p>
         {companyLabel ? <p className="mt-1 text-xs text-muted-foreground/90">Shared by {companyLabel}</p> : null}
       </div>
 
-      <section className="rounded-xl border border-border/70 p-4">
-        <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">DISC placement</h4>
-        <p className="mt-2 text-sm text-muted-foreground">Din primære placering i DISC-firkanten vises med markøren.</p>
-        <div className="mt-4">
+      <section className="rounded-xl border border-border/70 p-4 sm:p-5">
+        <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">DISC overview</h4>
+        <div className="mt-4 grid gap-5 lg:grid-cols-[13rem_minmax(0,1fr)] lg:items-center">
+          <div className="rounded-xl border border-border/60 bg-muted/20 p-3">
+            <h5 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Vægtning</h5>
+            <ul className="mt-3 space-y-2 text-sm">
+              <li className="flex items-center justify-between"><span className="text-muted-foreground">D</span><span className="font-semibold text-foreground">{formatDimensionValue(viewModel.dimensionScores.D)}</span></li>
+              <li className="flex items-center justify-between"><span className="text-muted-foreground">I</span><span className="font-semibold text-foreground">{formatDimensionValue(viewModel.dimensionScores.I)}</span></li>
+              <li className="flex items-center justify-between"><span className="text-muted-foreground">S</span><span className="font-semibold text-foreground">{formatDimensionValue(viewModel.dimensionScores.S)}</span></li>
+              <li className="flex items-center justify-between"><span className="text-muted-foreground">C</span><span className="font-semibold text-foreground">{formatDimensionValue(viewModel.dimensionScores.C)}</span></li>
+            </ul>
+          </div>
           <DiscSquare x={placement.x} y={placement.y} />
         </div>
       </section>
 
       <section className="rounded-xl border border-border/70 p-4">
-        <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Scores</h4>
-        <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-          <li>D: <span className="font-medium text-foreground">{formatDimensionValue(viewModel.dimensionScores.D)}</span></li>
-          <li>I: <span className="font-medium text-foreground">{formatDimensionValue(viewModel.dimensionScores.I)}</span></li>
-          <li>S: <span className="font-medium text-foreground">{formatDimensionValue(viewModel.dimensionScores.S)}</span></li>
-          <li>C: <span className="font-medium text-foreground">{formatDimensionValue(viewModel.dimensionScores.C)}</span></li>
-        </ul>
-      </section>
-
-      <section className="rounded-xl border border-border/70 p-4">
-        <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Your profile summary</h4>
-        <p className="mt-3 text-sm leading-6 text-muted-foreground">{viewModel.profileSummary ?? "No profile summary was returned by disc-engine."}</p>
-      </section>
-
-      {qualityIndicatorEntries.length > 0 ? (
-        <section className="rounded-xl border border-border/70 p-4">
-          <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Quality indicators</h4>
-          <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
-            {qualityIndicatorEntries.slice(0, 8).map(([key, value]) => (
-              <li key={key}>
-                {key}: <span className="font-medium text-foreground">{renderValue(value)}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      <section className="rounded-xl border border-border/70 p-4">
-        <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Metadata</h4>
-        <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-          <li>Created: {formatDate(createdAt)}</li>
-          <li>Completed: {formatDate(completionDate)}</li>
-          <li>Response count: {viewModel.responseCount}</li>
-          <li>Primary dimension: {renderValue(viewModel.primaryDimension)}</li>
-          <li>Secondary dimension: {renderValue(viewModel.secondaryDimension)}</li>
-          <li>Lifecycle status: {renderValue(viewModel.lifecycleStatus)}</li>
-        </ul>
-        {externalSessionId ? (
-          <details className="mt-3">
-            <summary className="cursor-pointer text-xs text-muted-foreground">Technical details</summary>
-            <p className="mt-2 break-all text-xs text-muted-foreground">Session ID: {externalSessionId}</p>
-          </details>
-        ) : null}
+        <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Profile summary</h4>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">{profileSummary}</p>
       </section>
 
       {pdfHref ? (

@@ -7,6 +7,9 @@ export const dynamic = "force-dynamic";
 
 export default async function DiscAssessmentPage() {
   const user = await requireUser();
+  const totalAssessmentCountPromise = prisma.discAssessment.count({
+    where: { userId: user.id },
+  });
   const companyMembership = await prisma.companyMembership.findFirst({
     where: {
       userId: user.id,
@@ -34,6 +37,7 @@ export default async function DiscAssessmentPage() {
       },
     },
   });
+  const totalAssessmentCount = await totalAssessmentCountPromise;
 
   const assessmentsWithShares = await Promise.all(
     assessments.map(async (assessment) => {
@@ -55,5 +59,12 @@ export default async function DiscAssessmentPage() {
     }),
   );
 
-  return <DiscAssessmentClient userId={user.id} assessments={assessmentsWithShares} hasCompanyDiscAccess={Boolean(companyMembership)} />;
+  return (
+    <DiscAssessmentClient
+      userId={user.id}
+      assessments={assessmentsWithShares}
+      totalAssessmentCount={totalAssessmentCount}
+      hasCompanyDiscAccess={Boolean(companyMembership)}
+    />
+  );
 }

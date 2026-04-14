@@ -190,6 +190,57 @@ export function buildDiscResultViewModel(rawResponses: unknown): DiscResultViewM
   };
 }
 
+function getDominantDimensions(dimensionScores: Record<DiscDimension, number | null>) {
+  const entries = (["D", "I", "S", "C"] as const)
+    .map((dimension) => ({
+      dimension,
+      score: dimensionScores[dimension] ?? Number.NEGATIVE_INFINITY,
+    }))
+    .sort((a, b) => b.score - a.score);
+
+  const primary = entries[0]?.dimension ?? null;
+  const secondary = entries[1]?.dimension ?? null;
+
+  return { primary, secondary };
+}
+
+function summaryByPrimaryDimension(primary: DiscDimension | null, secondary: DiscDimension | null) {
+  if (primary === "D") {
+    return secondary === "I"
+      ? "Du har en direkte og energisk stil. Du tager ofte initiativ, kommunikerer tydeligt og trives med fremdrift og synlige resultater."
+      : "Du har en målrettet og handlekraftig stil. Du tager ansvar hurtigt, søger klare beslutninger og arbejder bedst, når retningen er tydelig.";
+  }
+
+  if (primary === "I") {
+    return secondary === "D"
+      ? "Du har en udadvendt og resultatorienteret stil. Du motiverer andre med energi, skaber momentum og er ofte den, der får ting i gang."
+      : "Du har en engagerende og relationsstærk stil. Du kommunikerer positivt, skaber kontakt hurtigt og bidrager med energi i samarbejdet.";
+  }
+
+  if (primary === "S") {
+    return secondary === "C"
+      ? "Du har en rolig og stabil stil med blik for kvalitet. Du arbejder struktureret, skaber tryghed i samarbejdet og følger tingene til dørs."
+      : "Du har en støttende og stabil stil. Du samarbejder loyalt, lytter godt og bidrager til kontinuitet og et godt teammiljø.";
+  }
+
+  if (primary === "C") {
+    return secondary === "S"
+      ? "Du har en analytisk og grundig stil. Du prioriterer præcision, arbejder systematisk og sikrer høj kvalitet i leverancerne."
+      : "Du har en kvalitetsorienteret og faktabaseret stil. Du trives med struktur, tydelige rammer og velbegrundede beslutninger.";
+  }
+
+  return "Din profil viser en afbalanceret DISC-stil. Du kan typisk tilpasse din kommunikation og arbejdsform til situationen.";
+}
+
+export function buildDiscProfileSummary(viewModel: DiscResultViewModel) {
+  if (viewModel.profileSummary) {
+    return viewModel.profileSummary;
+  }
+
+  const { primary, secondary } = getDominantDimensions(viewModel.dimensionScores);
+  return summaryByPrimaryDimension(viewModel.primaryDimension ?? primary, viewModel.secondaryDimension ?? secondary);
+}
+
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
