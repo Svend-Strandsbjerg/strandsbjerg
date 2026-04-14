@@ -45,6 +45,19 @@ const LIKERT_TONES = [
   "from-emerald-100 to-emerald-200 border-emerald-300 text-emerald-900",
 ] as const;
 
+const QUESTION_ADVANCE_DELAY_MS = 180;
+const COMPLETION_TRANSITION_DELAY_MS = 1050;
+const QUESTION_PREVIEW_MAX = 46;
+
+function toQuestionPreview(prompt: string) {
+  const collapsed = prompt.replace(/\s+/g, " ").trim();
+  if (collapsed.length <= QUESTION_PREVIEW_MAX) {
+    return collapsed;
+  }
+
+  return `${collapsed.slice(0, QUESTION_PREVIEW_MAX - 1).trimEnd()}…`;
+}
+
 export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments }: DiscAssessmentClientProps) {
   const router = useRouter();
   const [startState, startAction, starting] = useActionState(startDiscAssessment, initialDiscFlowState);
@@ -61,6 +74,29 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
   const hasStartedSession = Boolean(currentSessionId);
   const hasQuestions = questions.length > 0;
   const activeQuestion = hasQuestions ? questions[Math.min(activeQuestionIndex, questions.length - 1)] : null;
+  const [isMobileTimelineOpen, setIsMobileTimelineOpen] = useState(false);
+
+  const timelineItems = useMemo(() => {
+    return questions
+      .map((question, index) => {
+        const answerId = selectedOptionIdByQuestionId[question.id] ?? "";
+        const isCurrent = index === activeQuestionIndex;
+        const isAnswered = Boolean(answerId);
+        const shouldShow = isCurrent || (index < activeQuestionIndex && isAnswered);
+        if (!shouldShow) {
+          return null;
+        }
+
+        return {
+          questionId: question.id,
+          index,
+          isCurrent,
+          isAnswered,
+          preview: toQuestionPreview(question.prompt),
+        };
+      })
+      .filter((item): item is { questionId: string; index: number; isCurrent: boolean; isAnswered: boolean; preview: string } => item !== null);
+  }, [activeQuestionIndex, questions, selectedOptionIdByQuestionId]);
 
   const responsesPayload = useMemo(() => {
     const responses = questions
@@ -110,7 +146,7 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
     const isLastQuestion = activeQuestionIndex >= questions.length - 1;
     if (isLastQuestion) {
       setIsCompletingAssessment(true);
-      window.setTimeout(() => submitFormRef.current?.requestSubmit(), 280);
+      window.setTimeout(() => submitFormRef.current?.requestSubmit(), COMPLETION_TRANSITION_DELAY_MS);
       return;
     }
 
@@ -118,7 +154,7 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
     window.setTimeout(() => {
       setActiveQuestionIndex((index) => Math.min(questions.length - 1, index + 1));
       setIsTransitioningQuestion(false);
-    }, 180);
+    }, QUESTION_ADVANCE_DELAY_MS);
   };
 
   const progressPercent = hasQuestions ? ((activeQuestionIndex + 1) / questions.length) * 100 : 0;
@@ -242,7 +278,65 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
 
       {hasStartedSession && activeQuestion ? (
         <div className="fixed inset-0 z-50 bg-background">
-          <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 py-8 sm:px-8">
+          <div className="mx-auto flex min-h-full w-full max-w-6xl flex-col px-4 py-6 sm:px-8 sm:py-8">
+            <div className="mb-6 rounded-2xl border border-border/60 bg-muted/20 p-3 md:hidden">
+              <button
+                type="button"
+                onClick={() => setIsMobileTimelineOpen((open) => !open)}
+                className="flex w-full items-center justify-between text-left"
+              >
+                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Answer review</span>
+                <span className="text-xs text-muted-foreground">{timelineItems.length} shown</span>
+              </button>
+              {isMobileTimelineOpen ? (
+                <div className="mt-3 space-y-2">
+                  {timelineItems.map((item) => (
+                    <button
+                      key={item.questionId}
+                      type="button"
+                      onClick={() => {
+                        setActiveQuestionIndex(item.index);
+                        setIsMobileTimelineOpen(false);
+                      }}
+                      disabled={!item.isAnswered && !item.isCurrent}
+                      className={cn(
+                        "w-full rounded-xl border px-3 py-2 text-left text-xs transition",
+                        item.isCurrent ? "border-foreground/40 bg-foreground/5 text-foreground" : "border-border/70 bg-card text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      <span className="mr-1 text-[11px] uppercase tracking-[0.12em]">#{item.index + 1}</span>
+                      {item.preview}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="grid min-h-0 flex-1 gap-8 md:grid-cols-[240px_minmax(0,1fr)] md:items-start">
+              <aside className="sticky top-8 hidden max-h-[calc(100vh-4rem)] overflow-y-auto pr-2 md:block">
+                <p className="mb-4 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Answer timeline</p>
+                <div className="space-y-2">
+                  {timelineItems.map((item, itemIndex) => (
+                    <button
+                      key={item.questionId}
+                      type="button"
+                      onClick={() => setActiveQuestionIndex(item.index)}
+                      disabled={!item.isAnswered && !item.isCurrent}
+                      className={cn(
+                        "group relative w-full rounded-xl border px-3 py-2 text-left transition",
+                        item.isCurrent ? "border-foreground/40 bg-foreground/5 text-foreground shadow-sm" : "border-border/70 bg-card text-muted-foreground hover:border-border hover:text-foreground",
+                      )}
+                    >
+                      {itemIndex < timelineItems.length - 1 ? <span className="pointer-events-none absolute -bottom-3 left-5 h-3 w-px bg-border/80" /> : null}
+                      <span className={cn("mr-2 inline-block h-2 w-2 rounded-full", item.isCurrent ? "bg-foreground" : "bg-muted-foreground/60")} />
+                      <span className="text-[11px] uppercase tracking-[0.12em]">#{item.index + 1}</span>
+                      <p className="mt-1 line-clamp-2 text-xs leading-relaxed">{item.preview}</p>
+                    </button>
+                  ))}
+                </div>
+              </aside>
+
+              <div>
             <div className="mb-8 space-y-3">
               <div className="flex items-center justify-between text-sm text-muted-foreground">
                 <span>Spørgsmål {activeQuestionIndex + 1} af {questions.length}</span>
@@ -288,10 +382,15 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
               )}
 
               {isCompletingAssessment || submitting ? (
-                <p className="mt-8 text-sm text-muted-foreground">Behandler dine svar...</p>
+                <div className="mt-8 space-y-1 text-sm text-muted-foreground">
+                  <p>Processing your DISC profile...</p>
+                  <p className="text-xs">Vi samler dine svar og gør resultatet klar.</p>
+                </div>
               ) : (
                 <p className="mt-8 text-sm text-muted-foreground">Vælg det svar der passer bedst — og gå videre.</p>
               )}
+            </div>
+              </div>
             </div>
           </div>
         </div>
