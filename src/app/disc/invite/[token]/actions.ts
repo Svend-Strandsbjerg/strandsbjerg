@@ -192,8 +192,19 @@ export async function submitInviteDiscAssessment(_: InviteDiscState, formData: F
     }
 
     await submitDiscResponses({ sessionId, responses: validatedResponses });
+    logServerEvent("info", "disc_invite_complete_call_started", { sessionId });
     await completeDiscSession({ sessionId });
+    logServerEvent("info", "disc_invite_complete_call_succeeded", { sessionId });
+    logServerEvent("info", "disc_invite_result_fetch_started", { sessionId });
     const resultPayload = await getDiscSessionResult(sessionId);
+    const resultRecord = resultPayload as Record<string, unknown>;
+    const nestedResult = resultRecord.result && typeof resultRecord.result === "object" ? (resultRecord.result as Record<string, unknown>) : null;
+    logServerEvent("info", "disc_invite_result_fetch_succeeded", {
+      sessionId,
+      hasDimensions: Boolean((nestedResult ?? resultRecord).dimensions),
+      hasProfileSummary: typeof (nestedResult ?? resultRecord).profileSummary === "string",
+      hasQualityIndicators: Boolean((nestedResult ?? resultRecord).qualityIndicators),
+    });
     const persistedPayload = {
       responses: validatedResponses,
       result: JSON.parse(JSON.stringify(resultPayload)) as Prisma.InputJsonValue,
@@ -201,6 +212,10 @@ export async function submitInviteDiscAssessment(_: InviteDiscState, formData: F
     await markDiscAssessmentSubmitted({
       externalSessionId: sessionId,
       rawResponses: persistedPayload,
+    });
+    logServerEvent("info", "disc_invite_result_persisted", {
+      sessionId,
+      persistedResultKeys: Object.keys(resultRecord).slice(0, 20).join(","),
     });
 
     await prisma.assessmentInvite.updateMany({

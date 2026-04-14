@@ -181,8 +181,28 @@ export async function submitDiscAssessmentResponses(_: DiscFlowState, formData: 
       sessionId,
       responses: validatedResponses,
     });
+    logServerEvent("info", "disc_flow_complete_call_started", { userId, sessionId });
     await completeDiscSession({ sessionId });
+    logServerEvent("info", "disc_flow_complete_call_succeeded", { userId, sessionId });
+    logServerEvent("info", "disc_flow_result_fetch_started", { userId, sessionId });
     const resultPayload = await getDiscSessionResult(sessionId);
+    const resultRecord = resultPayload as Record<string, unknown>;
+    const dimensionsPayload = resultRecord.result && typeof resultRecord.result === "object"
+      ? (resultRecord.result as Record<string, unknown>).dimensions
+      : resultRecord.dimensions;
+    const profileSummaryPayload = resultRecord.result && typeof resultRecord.result === "object"
+      ? (resultRecord.result as Record<string, unknown>).profileSummary
+      : resultRecord.profileSummary;
+    const qualityIndicatorsPayload = resultRecord.result && typeof resultRecord.result === "object"
+      ? (resultRecord.result as Record<string, unknown>).qualityIndicators
+      : resultRecord.qualityIndicators;
+    logServerEvent("info", "disc_flow_result_fetch_succeeded", {
+      userId,
+      sessionId,
+      hasDimensions: Boolean(dimensionsPayload),
+      hasProfileSummary: typeof profileSummaryPayload === "string",
+      hasQualityIndicators: Boolean(qualityIndicatorsPayload),
+    });
     const persistedPayload = {
       responses: validatedResponses,
       result: JSON.parse(JSON.stringify(resultPayload)) as Prisma.InputJsonValue,
@@ -190,6 +210,11 @@ export async function submitDiscAssessmentResponses(_: DiscFlowState, formData: 
     await markDiscAssessmentSubmitted({
       externalSessionId: sessionId,
       rawResponses: persistedPayload,
+    });
+    logServerEvent("info", "disc_flow_result_persisted", {
+      userId,
+      sessionId,
+      persistedResultKeys: Object.keys(resultRecord).slice(0, 20).join(","),
     });
 
     cookieStore.set(DISC_SUBMITTED_COOKIE, sessionId, {
