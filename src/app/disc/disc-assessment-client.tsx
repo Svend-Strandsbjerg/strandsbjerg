@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 type DiscAssessmentClientProps = {
   userId: string | null;
   hasCompanyDiscAccess: boolean;
+  totalAssessmentCount: number;
   assessments: Array<{
     id: string;
     status: "STARTED" | "SUBMITTED" | "FAILED";
@@ -59,7 +60,7 @@ const LIKERT_NODE_TONES = [
 const QUESTION_ADVANCE_DELAY_MS = 180;
 const COMPLETION_TRANSITION_DELAY_MS = 250;
 
-export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments }: DiscAssessmentClientProps) {
+export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, totalAssessmentCount, assessments }: DiscAssessmentClientProps) {
   const router = useRouter();
   const [startState, startAction, starting] = useActionState(startDiscAssessment, initialDiscFlowState);
   const [submitState, submitAction, submitting] = useActionState(submitDiscAssessmentResponses, initialDiscFlowState);
@@ -139,6 +140,7 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
     if (startState.status === "success" && startState.sessionId && startState.questions.length > 0) {
       setActiveSessionId(startState.sessionId);
       setIsAssessmentModalOpen(true);
+      setIsStartModalOpen(false);
       setActiveQuestionIndex(0);
       setHasEnteredFinalOverview(false);
       setSelectedOptionIdByQuestionId({});
@@ -152,6 +154,7 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
       setIsCompletingAssessment(false);
       setIsAssessmentModalOpen(false);
       setHasEnteredFinalOverview(false);
+      setIsStartModalOpen(false);
       router.refresh();
     }
 
@@ -261,6 +264,11 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
             {userId ? (
               <div className="space-y-3 rounded-xl border border-border/80 bg-muted/20 p-4">
                 <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Your assessment history</h3>
+                {totalAssessmentCount > assessments.length ? (
+                  <p className="text-xs text-muted-foreground">
+                    Showing latest {assessments.length} of {totalAssessmentCount} assessments.
+                  </p>
+                ) : null}
                 {assessments.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No saved assessments yet.</p>
                 ) : (
@@ -268,7 +276,7 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
                     {assessments.map((assessment, index) => (
                       <DiscResultPresentation
                         key={assessment.id}
-                        title={`Assessment #${assessments.length - index}`}
+                        title={`Assessment #${Math.max(totalAssessmentCount - index, 1)}`}
                         status={assessment.status}
                         createdAt={assessment.createdAt}
                         submittedAt={assessment.submittedAt}
