@@ -1,6 +1,4 @@
-import { buildDiscInsights } from "@/lib/disc-result-insights";
-
-type ResponseRecord = Record<string, unknown>;
+import { buildDiscResultViewModel } from "@/lib/disc-result-insights";
 
 type DiscResultPresentationProps = {
   title: string;
@@ -27,32 +25,6 @@ function formatDate(value: Date | null) {
   }).format(value);
 }
 
-function getDimensionSamples(records: ResponseRecord[]) {
-  const samples: Array<{ dimension: string; value: string }> = [];
-
-  for (const entry of records) {
-    const dimension =
-      (typeof entry.dimension === "string" && entry.dimension) ||
-      (typeof entry.trait === "string" && entry.trait) ||
-      (typeof entry.questionId === "string" && entry.questionId)
-        ? String(entry.dimension ?? entry.trait ?? entry.questionId)
-        : null;
-
-    const rawValue = entry.value;
-    const value = typeof rawValue === "string" || typeof rawValue === "number" ? String(rawValue) : null;
-
-    if (dimension && value) {
-      samples.push({ dimension, value });
-    }
-
-    if (samples.length >= 6) {
-      break;
-    }
-  }
-
-  return samples;
-}
-
 function renderValue(value: unknown) {
   if (value === null || value === undefined) {
     return "—";
@@ -69,6 +41,14 @@ function renderValue(value: unknown) {
   }
 }
 
+function formatDimensionValue(value: number | null) {
+  if (value === null) {
+    return "—";
+  }
+
+  return Number.isInteger(value) ? `${value}` : value.toFixed(2);
+}
+
 export function DiscResultPresentation({
   title,
   status,
@@ -81,16 +61,17 @@ export function DiscResultPresentation({
   emptyMessage,
   footerNote,
 }: DiscResultPresentationProps) {
-  const { records, interpretationText, dominantInsight, secondaryInsight, dimensionCounts, qualityIndicators, canonicalResult } = buildDiscInsights(rawResponses);
-  const dimensionSamples = getDimensionSamples(records);
+  const viewModel = buildDiscResultViewModel(rawResponses);
   const completionDate = submittedAt ?? (status === "SUBMITTED" ? createdAt : null);
-  const qualityIndicatorEntries = qualityIndicators ? Object.entries(qualityIndicators) : [];
+  const qualityIndicatorEntries = Object.entries(viewModel.qualityIndicators);
+
   const renderedViewModel = {
     status,
-    dimensionCounts,
-    primaryDimension: canonicalResult?.primaryDimension ?? null,
-    secondaryDimension: canonicalResult?.secondaryDimension ?? null,
-    lifecycleStatus: canonicalResult?.lifecycleStatus ?? null,
+    dimensions: viewModel.dimensionScores,
+    primaryDimension: viewModel.primaryDimension,
+    secondaryDimension: viewModel.secondaryDimension,
+    lifecycleStatus: viewModel.lifecycleStatus,
+    profileSummary: viewModel.profileSummary,
     qualityIndicatorKeys: qualityIndicatorEntries.map(([key]) => key),
   };
 
@@ -98,13 +79,8 @@ export function DiscResultPresentation({
     JSON.stringify({
       event: "disc_result_render_payload",
       rawEngineResultPayload: rawResponses,
-      mappedLocalResult: canonicalResult,
-      finalRenderedViewModel: renderedViewModel,
-      hasEngineResult: Boolean(canonicalResult),
-      hasDimensions: Boolean((canonicalResult as Record<string, unknown> | null)?.dimensions),
-      hasProfileSummary: typeof (canonicalResult as Record<string, unknown> | null)?.profileSummary === "string",
-      hasQualityIndicators: qualityIndicatorEntries.length > 0,
-      dimensionCounts,
+      mappedViewModel: renderedViewModel,
+      hasEngineResult: Boolean(viewModel.canonicalResult),
     }),
   );
 
@@ -117,7 +93,7 @@ export function DiscResultPresentation({
     );
   }
 
-  if (records.length === 0 && !interpretationText) {
+  if (!viewModel.canonicalResult) {
     return (
       <div className="rounded-xl border border-border/70 bg-muted/20 p-4 text-sm">
         <p className="font-medium">{title}</p>
@@ -137,47 +113,31 @@ export function DiscResultPresentation({
       </div>
 
       <section className="rounded-xl border border-border/70 p-4">
-        <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Your profile summary</h4>
-        <p className="mt-3 text-sm leading-6 text-muted-foreground">
-          {dominantInsight
-            ? `${dominantInsight.label} appears most prominent in this result${secondaryInsight ? `, with support from ${secondaryInsight.label}` : ""}.`
-            : "A completed response set is available, but a dominant DISC dimension could not be inferred from the current payload."}
-        </p>
-        {dominantInsight ? <p className="mt-3 text-sm leading-6 text-muted-foreground">{dominantInsight.summary}</p> : null}
-        {interpretationText ? <p className="mt-3 text-sm leading-6 text-muted-foreground">{interpretationText}</p> : null}
+        <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">DISC dimensions</h4>
+        <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+          <li>D: <span className="font-medium text-foreground">{formatDimensionValue(viewModel.dimensionScores.D)}</span></li>
+          <li>I: <span className="font-medium text-foreground">{formatDimensionValue(viewModel.dimensionScores.I)}</span></li>
+          <li>S: <span className="font-medium text-foreground">{formatDimensionValue(viewModel.dimensionScores.S)}</span></li>
+          <li>C: <span className="font-medium text-foreground">{formatDimensionValue(viewModel.dimensionScores.C)}</span></li>
+        </ul>
       </section>
 
-      {dominantInsight ? (
-        <>
-          <section className="rounded-xl border border-border/70 p-4">
-            <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Strengths</h4>
-            <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-muted-foreground">
-              {dominantInsight.strengths.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </section>
+      <section className="rounded-xl border border-border/70 p-4">
+        <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Your profile summary</h4>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">{viewModel.profileSummary ?? "No profile summary was returned by disc-engine."}</p>
+      </section>
 
-          <section className="rounded-xl border border-border/70 p-4">
-            <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Potential challenges</h4>
-            <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-muted-foreground">
-              {dominantInsight.challenges.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </section>
-
-          <section className="grid gap-3 md:grid-cols-2">
-            <div className="rounded-xl border border-border/70 p-4">
-              <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">How you communicate</h4>
-              <p className="mt-3 text-sm leading-6 text-muted-foreground">{dominantInsight.communication}</p>
-            </div>
-            <div className="rounded-xl border border-border/70 p-4">
-              <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">How you work best</h4>
-              <p className="mt-3 text-sm leading-6 text-muted-foreground">{dominantInsight.workStyle}</p>
-            </div>
-          </section>
-        </>
+      {qualityIndicatorEntries.length > 0 ? (
+        <section className="rounded-xl border border-border/70 p-4">
+          <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Quality indicators</h4>
+          <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
+            {qualityIndicatorEntries.slice(0, 8).map(([key, value]) => (
+              <li key={key}>
+                {key}: <span className="font-medium text-foreground">{renderValue(value)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
       ) : null}
 
       <section className="rounded-xl border border-border/70 p-4">
@@ -185,23 +145,11 @@ export function DiscResultPresentation({
         <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
           <li>Created: {formatDate(createdAt)}</li>
           <li>Completed: {formatDate(completionDate)}</li>
-          <li>Response count: {records.length}</li>
-          <li>
-            DISC signals: D {dimensionCounts.D} · I {dimensionCounts.I} · S {dimensionCounts.S} · C {dimensionCounts.C}
-          </li>
-          <li>Primary dimension: {renderValue(canonicalResult?.primaryDimension)}</li>
-          <li>Secondary dimension: {renderValue(canonicalResult?.secondaryDimension)}</li>
-          <li>Lifecycle status: {renderValue(canonicalResult?.lifecycleStatus)}</li>
+          <li>Response count: {viewModel.responseCount}</li>
+          <li>Primary dimension: {renderValue(viewModel.primaryDimension)}</li>
+          <li>Secondary dimension: {renderValue(viewModel.secondaryDimension)}</li>
+          <li>Lifecycle status: {renderValue(viewModel.lifecycleStatus)}</li>
         </ul>
-        {qualityIndicatorEntries.length > 0 ? (
-          <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
-            {qualityIndicatorEntries.slice(0, 6).map(([key, value]) => (
-              <li key={key}>
-                Quality · {key}: <span className="font-medium text-foreground">{renderValue(value)}</span>
-              </li>
-            ))}
-          </ul>
-        ) : null}
         {externalSessionId ? (
           <details className="mt-3">
             <summary className="cursor-pointer text-xs text-muted-foreground">Technical details</summary>
@@ -209,19 +157,6 @@ export function DiscResultPresentation({
           </details>
         ) : null}
       </section>
-
-      {dimensionSamples.length > 0 ? (
-        <section className="rounded-xl border border-border/70 p-4">
-          <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Profile traits / dimensions</h4>
-          <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-            {dimensionSamples.map((item) => (
-              <li key={`${item.dimension}:${item.value}`}>
-                {item.dimension}: <span className="font-medium text-foreground">{item.value}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
 
       {footerNote ? <p className="px-1 text-xs text-muted-foreground">{footerNote}</p> : null}
     </div>

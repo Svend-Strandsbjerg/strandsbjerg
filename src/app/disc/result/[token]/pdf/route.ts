@@ -38,7 +38,13 @@ export async function GET(_: Request, context: { params: Promise<{ token: string
       });
     }
 
-    const pdfBytes = createDiscResultPdf(access.sharedResult);
+    const { pdfBytes, mappedViewModel } = createDiscResultPdf(access.sharedResult);
+    logServerEvent("info", "disc_result_pdf_payload_mapped", {
+      resultToken: token,
+      assessmentId: access.sharedResult.assessmentId,
+      rawEngineResultPayload: access.sharedResult.assessment.rawResponses,
+      mappedViewModel,
+    });
 
     return new NextResponse(pdfBytes, {
       status: 200,

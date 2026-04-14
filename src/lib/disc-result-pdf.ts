@@ -1,5 +1,5 @@
 import type { SharedDiscResultRecord } from "@/lib/disc-result-access";
-import { buildDiscInsights } from "@/lib/disc-result-insights";
+import { buildDiscResultViewModel } from "@/lib/disc-result-insights";
 
 function formatDate(value: Date | null) {
   if (!value) {
@@ -81,12 +81,21 @@ function buildPdfBytes(lines: string[]) {
   return Buffer.from(pdf, "binary");
 }
 
+function formatDimensionValue(value: number | null) {
+  if (value === null) {
+    return "—";
+  }
+
+  return Number.isInteger(value) ? `${value}` : value.toFixed(2);
+}
+
 export function createDiscResultPdf(shared: SharedDiscResultRecord) {
   const assessment = shared.assessment;
   const completionDate = assessment.submittedAt ?? assessment.createdAt;
-  const { dominantInsight, secondaryInsight, interpretationText } = buildDiscInsights(assessment.rawResponses);
+  const viewModel = buildDiscResultViewModel(assessment.rawResponses);
   const candidateLabel = assessment.candidateName ?? assessment.candidateEmail ?? "Candidate";
   const companyLabel = assessment.company?.name;
+  const qualityIndicatorEntries = Object.entries(viewModel.qualityIndicators);
 
   const lines: string[] = [
     "DISC Profile Result",
@@ -96,36 +105,31 @@ export function createDiscResultPdf(shared: SharedDiscResultRecord) {
     `Candidate: ${candidateLabel}`,
     `Completed: ${formatDate(completionDate)}`,
     "",
+    "DISC dimensions",
+    `D: ${formatDimensionValue(viewModel.dimensionScores.D)}`,
+    `I: ${formatDimensionValue(viewModel.dimensionScores.I)}`,
+    `S: ${formatDimensionValue(viewModel.dimensionScores.S)}`,
+    `C: ${formatDimensionValue(viewModel.dimensionScores.C)}`,
+    "",
     "Your profile summary",
-    dominantInsight
-      ? `${dominantInsight.label} appears most prominent${secondaryInsight ? `, with support from ${secondaryInsight.label}` : ""}.`
-      : "A dominant DISC dimension could not be inferred from the available response data.",
+    ...(viewModel.profileSummary ? wrapLine(viewModel.profileSummary) : ["No profile summary was returned by disc-engine."]),
+    "",
+    `Primary dimension: ${viewModel.primaryDimension ?? "—"}`,
+    `Secondary dimension: ${viewModel.secondaryDimension ?? "—"}`,
+    `Lifecycle status: ${viewModel.lifecycleStatus ?? "—"}`,
   ];
 
-  if (dominantInsight) {
-    lines.push(...wrapLine(dominantInsight.summary), "", "Strengths");
-    for (const item of dominantInsight.strengths) {
-      lines.push(...wrapLine(`• ${item}`));
+  if (qualityIndicatorEntries.length > 0) {
+    lines.push("", "Quality indicators");
+    for (const [key, value] of qualityIndicatorEntries.slice(0, 8)) {
+      lines.push(...wrapLine(`${key}: ${typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? String(value) : JSON.stringify(value)}`));
     }
-
-    lines.push("", "Potential challenges");
-    for (const item of dominantInsight.challenges) {
-      lines.push(...wrapLine(`• ${item}`));
-    }
-
-    lines.push("", "How you communicate");
-    lines.push(...wrapLine(dominantInsight.communication));
-
-    lines.push("", "How you work best");
-    lines.push(...wrapLine(dominantInsight.workStyle));
-  }
-
-  if (interpretationText) {
-    lines.push("", "Additional interpretation");
-    lines.push(...wrapLine(interpretationText));
   }
 
   lines.push("", "This assessment was generated using the DISC framework.");
 
-  return buildPdfBytes(lines.slice(0, 220));
+  return {
+    pdfBytes: buildPdfBytes(lines.slice(0, 220)),
+    mappedViewModel: viewModel,
+  };
 }

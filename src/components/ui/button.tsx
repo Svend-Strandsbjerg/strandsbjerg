@@ -3,7 +3,7 @@ import { cloneElement, isValidElement, type ButtonHTMLAttributes, type ReactElem
 import { cn } from "@/lib/utils";
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "default" | "outline";
+  variant?: "default" | "outline" | "ghost";
   asChild?: boolean;
 };
 
@@ -12,7 +12,9 @@ export function Button({ className, variant = "default", asChild = false, childr
     "inline-flex items-center justify-center rounded-full px-5 py-2.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-60",
     variant === "default"
       ? "bg-primary text-primary-foreground shadow-sm hover:opacity-90"
-      : "border border-border bg-card text-foreground hover:bg-muted",
+      : variant === "outline"
+        ? "border border-border bg-card text-foreground hover:bg-muted"
+        : "bg-transparent text-muted-foreground hover:bg-muted/70 hover:text-foreground",
     className,
   );
 
