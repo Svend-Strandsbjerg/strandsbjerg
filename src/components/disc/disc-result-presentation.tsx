@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { buildDiscInsights } from "@/lib/disc-result-insights";
 
 type ResponseRecord = Record<string, unknown>;
@@ -13,7 +14,15 @@ type DiscResultPresentationProps = {
   companyLabel?: string;
   emptyMessage?: string;
   footerNote?: string;
+  pdfHref?: string;
 };
+
+const DISC_DIMENSIONS = [
+  { key: "D", label: "Dominance", color: "bg-red-500", lightColor: "bg-red-100", textColor: "text-red-900" },
+  { key: "I", label: "Influence", color: "bg-yellow-400", lightColor: "bg-yellow-100", textColor: "text-yellow-900" },
+  { key: "S", label: "Steadiness", color: "bg-green-500", lightColor: "bg-green-100", textColor: "text-green-900" },
+  { key: "C", label: "Conscientiousness", color: "bg-blue-500", lightColor: "bg-blue-100", textColor: "text-blue-900" },
+] as const;
 
 function formatDate(value: Date | null) {
   if (!value) {
@@ -69,6 +78,64 @@ function renderValue(value: unknown) {
   }
 }
 
+function DiscQuadrant({ dimensionCounts }: { dimensionCounts: { D: number; I: number; S: number; C: number } }) {
+  const maxScore = Math.max(dimensionCounts.D, dimensionCounts.I, dimensionCounts.S, dimensionCounts.C, 1);
+  const cells = [
+    { key: "D", x: 1, y: 0 },
+    { key: "I", x: 0, y: 0 },
+    { key: "S", x: 0, y: 1 },
+    { key: "C", x: 1, y: 1 },
+  ] as const;
+
+  const weightedX = (dimensionCounts.D + dimensionCounts.C) / (dimensionCounts.D + dimensionCounts.I + dimensionCounts.S + dimensionCounts.C || 1);
+  const weightedY = (dimensionCounts.S + dimensionCounts.C) / (dimensionCounts.D + dimensionCounts.I + dimensionCounts.S + dimensionCounts.C || 1);
+
+  return (
+    <section className="rounded-xl border border-border/70 p-4">
+      <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">DISC visualization</h4>
+      <div className="mt-4 grid gap-4 md:grid-cols-[220px_minmax(0,1fr)] md:items-center">
+        <div className="relative mx-auto grid h-52 w-52 grid-cols-2 grid-rows-2 overflow-hidden rounded-2xl border border-border/70">
+          {cells.map((cell) => {
+            const dim = DISC_DIMENSIONS.find((entry) => entry.key === cell.key);
+            const score = dimensionCounts[cell.key];
+            const intensity = Math.max(0.3, Math.min(1, score / maxScore));
+
+            return (
+              <div
+                key={cell.key}
+                className={`${dim?.lightColor ?? "bg-muted"} flex items-center justify-center border border-background/40`}
+                style={{ opacity: 0.5 + intensity * 0.5 }}
+              >
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-foreground">{cell.key}</p>
+                  <p className="text-xs font-medium text-muted-foreground">{score.toFixed(2)}</p>
+                </div>
+              </div>
+            );
+          })}
+          <span
+            className="pointer-events-none absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-foreground bg-background shadow"
+            style={{ left: `${weightedX * 100}%`, top: `${weightedY * 100}%` }}
+            aria-hidden
+          />
+        </div>
+
+        <ul className="grid gap-2 text-sm">
+          {DISC_DIMENSIONS.map((dimension) => (
+            <li key={dimension.key} className="flex items-center justify-between rounded-lg border border-border/70 px-3 py-2">
+              <div className="flex items-center gap-2">
+                <span className={`h-3 w-3 rounded-full ${dimension.color}`} />
+                <span className="font-medium">{dimension.key} · {dimension.label}</span>
+              </div>
+              <span className="text-muted-foreground">{dimensionCounts[dimension.key].toFixed(2)}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
+}
+
 export function DiscResultPresentation({
   title,
   status,
@@ -80,6 +147,7 @@ export function DiscResultPresentation({
   companyLabel,
   emptyMessage,
   footerNote,
+  pdfHref,
 }: DiscResultPresentationProps) {
   const { records, interpretationText, dominantInsight, secondaryInsight, dimensionCounts, qualityIndicators, canonicalResult } = buildDiscInsights(rawResponses);
   const dimensionSamples = getDimensionSamples(records);
@@ -147,6 +215,8 @@ export function DiscResultPresentation({
         {interpretationText ? <p className="mt-3 text-sm leading-6 text-muted-foreground">{interpretationText}</p> : null}
       </section>
 
+      <DiscQuadrant dimensionCounts={dimensionCounts} />
+
       {dominantInsight ? (
         <>
           <section className="rounded-xl border border-border/70 p-4">
@@ -186,13 +256,17 @@ export function DiscResultPresentation({
           <li>Created: {formatDate(createdAt)}</li>
           <li>Completed: {formatDate(completionDate)}</li>
           <li>Response count: {records.length}</li>
-          <li>
-            DISC signals: D {dimensionCounts.D} · I {dimensionCounts.I} · S {dimensionCounts.S} · C {dimensionCounts.C}
-          </li>
           <li>Primary dimension: {renderValue(canonicalResult?.primaryDimension)}</li>
           <li>Secondary dimension: {renderValue(canonicalResult?.secondaryDimension)}</li>
           <li>Lifecycle status: {renderValue(canonicalResult?.lifecycleStatus)}</li>
         </ul>
+        {pdfHref ? (
+          <div className="mt-3">
+            <Button asChild variant="outline" className="h-8 text-xs">
+              <a href={pdfHref}>Download PDF report</a>
+            </Button>
+          </div>
+        ) : null}
         {qualityIndicatorEntries.length > 0 ? (
           <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
             {qualityIndicatorEntries.slice(0, 6).map(([key, value]) => (

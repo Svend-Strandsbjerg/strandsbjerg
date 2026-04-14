@@ -29,6 +29,9 @@ type DiscAssessmentClientProps = {
     createdAt: Date;
     submittedAt: Date | null;
     rawResponses: unknown;
+    resultShare: {
+      token: string;
+    } | null;
   }>;
 };
 
@@ -159,11 +162,6 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
       return;
     }
 
-    const nextAnswerMap = {
-      ...selectedOptionIdByQuestionId,
-      [activeQuestion.id]: optionId,
-    };
-
     setSelectedOptionIdByQuestionId((previous) => ({
       ...previous,
       [activeQuestion.id]: optionId,
@@ -273,6 +271,7 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
                         submittedAt={assessment.submittedAt}
                         rawResponses={assessment.rawResponses}
                         externalSessionId={assessment.externalSessionId}
+                        pdfHref={assessment.resultShare ? `/disc/result/${assessment.resultShare.token}/pdf` : undefined}
                         emptyMessage="This completed assessment does not include full result details yet."
                       />
                     ))}
@@ -318,7 +317,7 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
             <p className="mt-2 text-sm text-muted-foreground">Du får ét spørgsmål ad gangen. Vælg det svar der føles mest rigtigt med det samme.</p>
             <p className="mt-2 text-sm font-medium text-foreground">Tager ca. 2–3 minutter.</p>
             <div className="mt-5 flex items-center justify-end gap-2">
-              <Button type="button" variant="ghost" onClick={() => setIsStartModalOpen(false)}>
+              <Button type="button" variant="outline" onClick={() => setIsStartModalOpen(false)}>
                 Luk
               </Button>
               <form action={startAction}>
@@ -363,7 +362,7 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
               ) : null}
             </div>
 
-            <div className={cn("grid min-h-0 flex-1 gap-6", isFinalOverviewVisible ? "md:grid-cols-[minmax(0,1fr)_280px] md:items-start" : "md:grid-cols-[120px_minmax(0,1fr)] md:items-start")}>
+            <div className={cn("grid min-h-0 flex-1 gap-6", isFinalOverviewVisible ? "md:grid-cols-1 md:items-start" : "md:grid-cols-[220px_minmax(0,1fr)_220px] md:items-start")}>
               <aside className={cn("sticky top-8 hidden pr-2 md:block", isFinalOverviewVisible ? "md:hidden" : "")}>
                 <p className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Oversigt</p>
                 <div className="rounded-2xl border border-border/60 bg-muted/10 p-3">
@@ -505,8 +504,11 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, assessments
                 )}
               </div>
 
+
+
+              {!isFinalOverviewVisible ? <div className="hidden md:block" aria-hidden /> : null}
               {isFinalOverviewVisible ? (
-                <aside className="rounded-2xl border border-border/70 bg-muted/20 p-4 md:sticky md:top-8">
+                <aside className="rounded-2xl border border-border/70 bg-muted/20 p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Afslut test</p>
                   <p className="mt-2 text-sm text-muted-foreground">Din besvarelse er låst. Klik herunder for at afslutte og se din rapport.</p>
                   <div className="mt-4">

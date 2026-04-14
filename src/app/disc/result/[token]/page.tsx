@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { DiscResultPresentation } from "@/components/disc/disc-result-presentation";
+import { ReturnToDiscButton } from "@/components/disc/return-to-disc-button";
 import { getSharedDiscResultAccess } from "@/lib/disc-result-access";
 
 type DiscResultSharePageProps = {
@@ -55,7 +56,7 @@ export default async function DiscResultSharePage({ params }: DiscResultSharePag
         </section>
       ) : null}
 
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground">This secure link provides view-only access to a completed DISC assessment.</p>
         <Link
           href={`/disc/result/${token}/pdf`}
@@ -63,6 +64,7 @@ export default async function DiscResultSharePage({ params }: DiscResultSharePag
         >
           Download PDF
         </Link>
+        <ReturnToDiscButton />
       </div>
 
       <DiscResultPresentation
