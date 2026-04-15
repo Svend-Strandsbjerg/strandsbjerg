@@ -319,11 +319,11 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, totalAssess
         {hasCompanyDiscAccess ? (
           <SectionBlock
             title="Company assessments"
-            subtitle="Invite candidates and review completed company DISC assessments for recruiter/admin workflows."
+            subtitle="Review company DISC assessments with role-based access for company admins and viewers."
           >
             <ContentContainer>
               <p className="text-sm text-muted-foreground">
-                Use the company admin area to create invite links and follow submitted assessments for your organization.
+                Use the company area to review submitted assessments. Company admins can additionally create and manage invites.
               </p>
               <div className="flex flex-wrap gap-3">
                 <Button asChild variant="outline">

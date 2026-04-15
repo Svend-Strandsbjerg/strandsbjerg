@@ -5,7 +5,8 @@ import { headers } from "next/headers";
 import { AssessmentInviteStatus } from "@prisma/client";
 
 import { requireUser } from "@/lib/access";
-import { isCompanyRecruiter } from "@/lib/company-access";
+import { canCreateCompanyProfile, canManageCompany } from "@/lib/company-access";
+import { type CompanyInviteActionState } from "@/app/disc/company/action-state";
 import { sendDiscEmail } from "@/lib/disc-email";
 import { createUniqueAssessmentInviteToken, getInviteAccessState, isActiveInviteUniqueConstraintError } from "@/lib/disc-invites";
 import { logServerEvent } from "@/lib/logger";
@@ -13,20 +14,11 @@ import { enforceRateLimit } from "@/lib/rate-limit";
 import { buildResultLink, ensureAssessmentResultShare } from "@/lib/disc-result-share";
 import { prisma } from "@/lib/prisma";
 
-export type CompanyInviteActionState = {
-  status: "idle" | "success" | "error";
-  message: string;
-};
 
-export const initialCompanyInviteActionState: CompanyInviteActionState = {
-  status: "idle",
-  message: "",
-};
+async function requireCompanyAdmin(userId: string, companyId: string) {
+  const canManage = await canManageCompany(userId, companyId);
 
-async function requireCompanyRecruiter(userId: string, companyId: string) {
-  const canRecruitForCompany = await isCompanyRecruiter(userId, companyId);
-
-  if (!canRecruitForCompany) {
+  if (!canManage) {
     throw new Error("Not authorized for this company");
   }
 }
@@ -65,7 +57,7 @@ export async function createAssessmentInvite(
   }
 
   try {
-    await requireCompanyRecruiter(user.id, companyId);
+    await requireCompanyAdmin(user.id, companyId);
 
     const candidateName = String(formData.get("candidateName") ?? "").trim() || null;
     const candidateEmail = String(formData.get("candidateEmail") ?? "").trim().toLowerCase() || null;
@@ -177,7 +169,7 @@ export async function invalidateAssessmentInvite(
       return { status: "error", message: "Invalid invite." };
     }
 
-    await requireCompanyRecruiter(user.id, companyId);
+    await requireCompanyAdmin(user.id, companyId);
 
     await prisma.assessmentInvite.updateMany({
       where: { id: inviteId, companyId },
@@ -216,7 +208,7 @@ export async function resendAssessmentResultEmail(
   }
 
   try {
-    await requireCompanyRecruiter(user.id, companyId);
+    await requireCompanyAdmin(user.id, companyId);
 
     const assessment = await prisma.discAssessment.findFirst({
       where: {
@@ -290,7 +282,7 @@ export async function resendAssessmentInviteEmail(
   }
 
   try {
-    await requireCompanyRecruiter(user.id, companyId);
+    await requireCompanyAdmin(user.id, companyId);
 
     const invite = await prisma.assessmentInvite.findFirst({
       where: {
@@ -353,6 +345,12 @@ export async function createCompanyProfile(
   formData: FormData,
 ): Promise<CompanyInviteActionState> {
   const user = await requireUser();
+  const mayCreateCompany = await canCreateCompanyProfile(user.id, user.role);
+
+  if (!mayCreateCompany) {
+    return { status: "error", message: "You are not allowed to create a company profile." };
+  }
+
   const companyName = String(formData.get("companyName") ?? "").trim();
 
   if (!companyName || companyName.length < 2) {

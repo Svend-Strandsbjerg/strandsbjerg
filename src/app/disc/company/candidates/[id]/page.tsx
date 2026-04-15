@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 
 import { DiscResultPresentation } from "@/components/disc/disc-result-presentation";
 import { requireUser } from "@/lib/access";
-import { isCompanyRecruiter } from "@/lib/company-access";
+import { canViewCompany } from "@/lib/company-access";
 import { ensureAssessmentResultShare } from "@/lib/disc-result-share";
 import { prisma } from "@/lib/prisma";
 
@@ -35,7 +35,7 @@ export default async function CandidateResultPage({ params }: CandidateResultPag
     },
   });
 
-  if (!assessment?.companyId || !(await isCompanyRecruiter(user.id, assessment.companyId))) {
+  if (!assessment?.companyId || !(await canViewCompany(user.id, assessment.companyId))) {
     notFound();
   }
 

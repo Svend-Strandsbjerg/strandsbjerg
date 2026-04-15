@@ -1,6 +1,7 @@
 import { DiscAssessmentClient } from "@/app/disc/disc-assessment-client";
 import { requireUser } from "@/lib/access";
 import { ensureAssessmentResultShare } from "@/lib/disc-result-share";
+import { canAccessCompanyArea } from "@/lib/company-access";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -10,15 +11,7 @@ export default async function DiscOverviewPage() {
   const totalAssessmentCountPromise = prisma.discAssessment.count({
     where: { userId: user.id },
   });
-  const companyMembership = await prisma.companyMembership.findFirst({
-    where: {
-      userId: user.id,
-      role: {
-        in: ["COMPANY_ADMIN", "COMPANY_RECRUITER"],
-      },
-    },
-    select: { id: true },
-  });
+  const hasCompanyAreaAccess = await canAccessCompanyArea(user.id);
   const assessments = await prisma.discAssessment.findMany({
     where: { userId: user.id },
     orderBy: { createdAt: "desc" },
@@ -64,7 +57,7 @@ export default async function DiscOverviewPage() {
       userId={user.id}
       assessments={assessmentsWithShares}
       totalAssessmentCount={totalAssessmentCount}
-      hasCompanyDiscAccess={Boolean(companyMembership)}
+      hasCompanyDiscAccess={hasCompanyAreaAccess}
     />
   );
 }
