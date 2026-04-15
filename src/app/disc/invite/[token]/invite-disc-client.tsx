@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 type InviteDiscClientProps = {
   token: string;
   candidateLabel: string;
+  companyLabel: string | null;
   inviteState: "active" | "expired" | "invalidated" | "completed";
   latestAssessment: {
     id: string;
@@ -72,7 +73,7 @@ function CopyResultLinkButton({ resultLink }: { resultLink: string }) {
   );
 }
 
-export function InviteDiscClient({ token, candidateLabel, inviteState, latestAssessment }: InviteDiscClientProps) {
+export function InviteDiscClient({ token, candidateLabel, companyLabel, inviteState, latestAssessment }: InviteDiscClientProps) {
   const router = useRouter();
   const [startState, startAction, starting] = useActionState(startInviteDiscAssessment, initialInviteDiscState);
   const [submitState, submitAction, submitting] = useActionState(submitInviteDiscAssessment, initialInviteDiscState);
@@ -174,9 +175,9 @@ export function InviteDiscClient({ token, candidateLabel, inviteState, latestAss
   if (inviteState === "completed" && latestAssessment) {
     return (
       <div className="space-y-4">
-        <p className="text-sm text-emerald-700">Assessment completed for {candidateLabel}.</p>
+        <p className="text-sm text-emerald-700">Assessment gennemført for {candidateLabel}.</p>
         <DiscResultPresentation
-          title="Candidate DISC result"
+          title="DISC-resultat"
           status={latestAssessment.status}
           createdAt={latestAssessment.createdAt}
           submittedAt={latestAssessment.submittedAt}
@@ -200,19 +201,20 @@ export function InviteDiscClient({ token, candidateLabel, inviteState, latestAss
           <p className="text-xs text-muted-foreground">A permanent result link will appear once processing completes.</p>
         )}
 
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => {
-            if (window.opener && !window.opener.closed) {
-              window.opener.location.href = "/disc";
-              window.opener.focus();
-            }
-            window.close();
-          }}
-        >
-          Close window and return to DISC
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <a
+            href="/disc/overview"
+            className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+          >
+            Gå til mit overblik
+          </a>
+          <a
+            href="/disc"
+            className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+          >
+            Til DISC-forsiden
+          </a>
+        </div>
       </div>
     );
   }
@@ -234,7 +236,11 @@ export function InviteDiscClient({ token, candidateLabel, inviteState, latestAss
   return (
     <>
       <div className="space-y-5">
-        <p className="text-sm text-muted-foreground">Invite for {candidateLabel}. Start, complete, and submit your DISC assessment below.</p>
+        <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
+          <p className="text-sm text-muted-foreground">
+            Invitation til {candidateLabel}{companyLabel ? ` fra ${companyLabel}` : ""}. Når du indsender testen, kan både du og virksomheden se resultatet.
+          </p>
+        </div>
 
         {!hasStartedSession ? (
           <Button type="button" onClick={() => setIsStartModalOpen(true)} disabled={starting}>

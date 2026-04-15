@@ -1,9 +1,11 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { DiscResultPresentation } from "@/components/disc/disc-result-presentation";
 import { requireUser } from "@/lib/access";
 import { isCompanyRecruiter } from "@/lib/company-access";
+import { ensureAssessmentResultShare } from "@/lib/disc-result-share";
 import { prisma } from "@/lib/prisma";
-import { DiscResultPresentation } from "@/components/disc/disc-result-presentation";
 
 type CandidateResultPageProps = {
   params: Promise<{ id: string }>;
@@ -25,6 +27,11 @@ export default async function CandidateResultPage({ params }: CandidateResultPag
       submittedAt: true,
       rawResponses: true,
       companyId: true,
+      company: {
+        select: {
+          name: true,
+        },
+      },
     },
   });
 
@@ -32,9 +39,18 @@ export default async function CandidateResultPage({ params }: CandidateResultPag
     notFound();
   }
 
+  const resultShare = assessment.status === "SUBMITTED" ? await ensureAssessmentResultShare(assessment.id) : null;
+
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
-      <h1 className="text-2xl font-semibold tracking-tight">Kandidatresultat</h1>
+    <div className="mx-auto max-w-4xl space-y-5 rounded-3xl border border-border/80 bg-card p-6 shadow-sm sm:p-8">
+      <header className="space-y-2 border-b border-border/70 pb-4">
+        <h1 className="text-2xl font-semibold tracking-tight">Kandidatresultat</h1>
+        <p className="text-sm text-muted-foreground">
+          Resultat for {assessment.candidateName ?? assessment.candidateEmail ?? "kandidat"}
+          {assessment.company?.name ? ` · ${assessment.company.name}` : ""}.
+        </p>
+      </header>
+
       <DiscResultPresentation
         title="DISC resultat"
         status={assessment.status}
@@ -43,8 +59,28 @@ export default async function CandidateResultPage({ params }: CandidateResultPag
         rawResponses={assessment.rawResponses}
         externalSessionId={assessment.externalSessionId}
         identityLabel={assessment.candidateName ?? assessment.candidateEmail ?? "Kandidat"}
+        companyLabel={assessment.company?.name}
+        pdfHref={resultShare ? `/disc/result/${resultShare.token}/pdf` : undefined}
         emptyMessage="Resultatdata mangler."
       />
+
+      <div className="flex flex-wrap gap-2">
+        <Link
+          href="/disc/company"
+          className="inline-flex h-9 items-center rounded-md border border-input bg-background px-4 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+        >
+          Tilbage til company-overblik
+        </Link>
+        {resultShare ? (
+          <Link
+            href={`/disc/result/${resultShare.token}`}
+            target="_blank"
+            className="inline-flex h-9 items-center rounded-md border border-input bg-background px-4 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+          >
+            Åbn delt resultatlink
+          </Link>
+        ) : null}
+      </div>
     </div>
   );
 }
