@@ -252,19 +252,23 @@ export function deriveDiscPlacement(dimensionScores: Record<DiscDimension, numbe
   const C = dimensionScores.C ?? 0;
   const total = D + I + S + C;
 
-  const x = total > 0 ? ((D + I) - (S + C)) / total : 0;
-  const y = total > 0 ? ((D + C) - (I + S)) / total : 0;
+  // DISC square layout:
+  // Top-left: D, top-right: I, bottom-left: C, bottom-right: S.
+  // Therefore:
+  // - x should move right with I + S, left with D + C.
+  // - y should move up with D + I, down with S + C.
+  const x = total > 0 ? ((I + S) - (D + C)) / total : 0;
+  const y = total > 0 ? ((D + I) - (S + C)) / total : 0;
   const clampedX = clamp(x, -1, 1);
   const clampedY = clamp(y, -1, 1);
 
-  const quadrant =
-    clampedX >= 0 && clampedY >= 0
-      ? "DI"
-      : clampedX >= 0 && clampedY < 0
-        ? "IS"
-        : clampedX < 0 && clampedY < 0
-          ? "SC"
-          : "CD";
+  const quadrantScores = {
+    DI: D + I,
+    IS: I + S,
+    SC: S + C,
+    CD: C + D,
+  } as const;
+  const quadrant = (Object.entries(quadrantScores).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "DI") as DiscPlacement["quadrant"];
 
   return {
     x: clampedX,
