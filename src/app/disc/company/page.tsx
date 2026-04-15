@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
-import { notFound } from "next/navigation";
 
 import { CompanyDiscAdmin } from "@/app/disc/company/company-disc-admin";
+import { CompanyProfileSetup } from "@/app/disc/company/company-profile-setup";
 import { requireUser } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 
@@ -87,7 +87,7 @@ export default async function CompanyDiscPage() {
   });
 
   if (companies.length === 0) {
-    notFound();
+    return <CompanyProfileSetup />;
   }
 
   return (

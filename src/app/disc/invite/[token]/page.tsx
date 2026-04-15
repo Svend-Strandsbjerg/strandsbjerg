@@ -1,7 +1,9 @@
 import { headers } from "next/headers";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { InviteDiscClient } from "@/app/disc/invite/[token]/invite-disc-client";
+import { auth } from "@/lib/auth";
+import { persistDiscInviteContext } from "@/lib/disc-invite-context";
 import { getInviteAccessState } from "@/lib/disc-invites";
 import { logServerEvent } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
@@ -23,6 +25,14 @@ function inferOrigin(hostHeader: string | null) {
 
 export default async function InviteDiscPage({ params }: InviteDiscPageProps) {
   const { token } = await params;
+  const session = await auth();
+
+  await persistDiscInviteContext(token);
+
+  if (!session?.user?.id) {
+    redirect(`/disc/login?invite=${encodeURIComponent(token)}&next=${encodeURIComponent(`/disc/invite/${token}`)}`);
+  }
+
   const requestHeaders = await headers();
   const invite = await prisma.assessmentInvite.findUnique({
     where: { token },

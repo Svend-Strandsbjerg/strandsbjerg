@@ -347,3 +347,44 @@ export async function resendAssessmentInviteEmail(
     return { status: "error", message: "Could not resend invite email." };
   }
 }
+
+export async function createCompanyProfile(
+  _: CompanyInviteActionState,
+  formData: FormData,
+): Promise<CompanyInviteActionState> {
+  const user = await requireUser();
+  const companyName = String(formData.get("companyName") ?? "").trim();
+
+  if (!companyName || companyName.length < 2) {
+    return { status: "error", message: "Company name must be at least 2 characters." };
+  }
+
+  try {
+    const company = await prisma.company.create({
+      data: {
+        name: companyName,
+        memberships: {
+          create: {
+            userId: user.id,
+            role: "COMPANY_ADMIN",
+          },
+        },
+      },
+      select: { id: true },
+    });
+
+    logServerEvent("info", "disc_company_profile_created", {
+      companyId: company.id,
+      createdByUserId: user.id,
+    });
+
+    revalidatePath("/disc/company");
+    return { status: "success", message: "Company profile created." };
+  } catch (error) {
+    logServerEvent("error", "disc_company_profile_create_failed", {
+      userId: user.id,
+      error,
+    });
+    return { status: "error", message: "Could not create company profile." };
+  }
+}
