@@ -262,31 +262,54 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, totalAssess
             ) : null}
 
             {userId ? (
-              <div className="space-y-3 rounded-xl border border-border/80 bg-muted/20 p-4">
-                <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Your assessment history</h3>
-                {totalAssessmentCount > assessments.length ? (
-                  <p className="text-xs text-muted-foreground">
-                    Showing latest {assessments.length} of {totalAssessmentCount} assessments.
-                  </p>
-                ) : null}
+              <div className="space-y-4 rounded-xl border border-border/80 bg-muted/20 p-4">
+                <div>
+                  <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Mit DISC-hjem</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">Dit nyeste resultat står øverst, og tidligere resultater ligger nedenfor.</p>
+                  {totalAssessmentCount > assessments.length ? (
+                    <p className="mt-1 text-xs text-muted-foreground">Viser de seneste {assessments.length} af i alt {totalAssessmentCount} assessments.</p>
+                  ) : null}
+                </div>
+
                 {assessments.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No saved assessments yet.</p>
+                  <p className="text-sm text-muted-foreground">Du har ikke gennemført en DISC endnu.</p>
                 ) : (
-                  <div className="space-y-3">
-                    {assessments.map((assessment, index) => (
-                      <DiscResultPresentation
-                        key={assessment.id}
-                        title={`Assessment #${Math.max(totalAssessmentCount - index, 1)}`}
-                        status={assessment.status}
-                        createdAt={assessment.createdAt}
-                        submittedAt={assessment.submittedAt}
-                        rawResponses={assessment.rawResponses}
-                        externalSessionId={assessment.externalSessionId}
-                        pdfHref={assessment.resultShare ? `/disc/result/${assessment.resultShare.token}/pdf` : undefined}
-                        emptyMessage="This completed assessment does not include full result details yet."
-                      />
-                    ))}
-                  </div>
+                  <>
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">Seneste assessment</p>
+                      <div className="mt-2">
+                        <DiscResultPresentation
+                          title="Seneste DISC-resultat"
+                          status={assessments[0].status}
+                          createdAt={assessments[0].createdAt}
+                          submittedAt={assessments[0].submittedAt}
+                          rawResponses={assessments[0].rawResponses}
+                          externalSessionId={assessments[0].externalSessionId}
+                          pdfHref={assessments[0].resultShare ? `/disc/result/${assessments[0].resultShare.token}/pdf` : undefined}
+                          emptyMessage="Dette resultat mangler stadig detaljer."
+                        />
+                      </div>
+                    </div>
+
+                    {assessments.length > 1 ? (
+                      <div className="space-y-3">
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Tidligere assessments</p>
+                        {assessments.slice(1).map((assessment, index) => (
+                          <DiscResultPresentation
+                            key={assessment.id}
+                            title={`Assessment historik #${index + 1}`}
+                            status={assessment.status}
+                            createdAt={assessment.createdAt}
+                            submittedAt={assessment.submittedAt}
+                            rawResponses={assessment.rawResponses}
+                            externalSessionId={assessment.externalSessionId}
+                            pdfHref={assessment.resultShare ? `/disc/result/${assessment.resultShare.token}/pdf` : undefined}
+                            emptyMessage="Dette resultat mangler stadig detaljer."
+                          />
+                        ))}
+                      </div>
+                    ) : null}
+                  </>
                 )}
               </div>
             ) : null}

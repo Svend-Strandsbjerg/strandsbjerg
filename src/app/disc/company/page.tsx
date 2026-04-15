@@ -43,13 +43,21 @@ export default async function CompanyDiscPage() {
               status: true,
               expiresAt: true,
               createdAt: true,
+              createdByUser: {
+                select: {
+                  name: true,
+                  email: true,
+                },
+              },
               assessments: {
-                where: { status: "SUBMITTED" },
-                orderBy: { submittedAt: "desc" },
+                orderBy: { createdAt: "desc" },
                 take: 1,
                 select: {
                   id: true,
+                  status: true,
+                  createdAt: true,
                   submittedAt: true,
+                  userId: true,
                   resultShare: {
                     select: {
                       token: true,
