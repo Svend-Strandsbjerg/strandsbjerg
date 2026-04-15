@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { AssessmentInviteStatus } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 
+import { auth } from "@/lib/auth";
 import { createDiscAssessmentRecord, markDiscAssessmentSubmitted } from "@/lib/disc-assessment";
 import type { DiscQuestion } from "@/lib/disc-types";
 import {
@@ -69,7 +70,13 @@ async function getActiveInviteOrThrow(token: string) {
 }
 
 export async function startInviteDiscAssessment(_: InviteDiscState, formData: FormData): Promise<InviteDiscState> {
+  const session = await auth();
+  const userId = session?.user?.id;
   const token = String(formData.get("token") ?? "").trim();
+
+  if (!userId) {
+    return { status: "error", message: "Log ind for at fortsætte invitationen.", sessionId: "", questions: [] };
+  }
 
   if (!token) {
     return { status: "error", message: "Invalid invite token.", sessionId: "", questions: [] };
@@ -89,13 +96,30 @@ export async function startInviteDiscAssessment(_: InviteDiscState, formData: Fo
     const existingAssessment = await prisma.discAssessment.findFirst({
       where: {
         inviteId: invite.id,
-        status: "STARTED",
+        status: {
+          in: ["STARTED", "SUBMITTED"],
+        },
       },
       orderBy: { createdAt: "desc" },
-      select: { externalSessionId: true },
+      select: { externalSessionId: true, userId: true },
     });
 
     if (existingAssessment) {
+      if (existingAssessment.userId && existingAssessment.userId !== userId) {
+        return { status: "error", message: "Invitationen er allerede knyttet til en anden bruger.", sessionId: "", questions: [] };
+      }
+
+      if (!existingAssessment.userId) {
+        await prisma.discAssessment.updateMany({
+          where: {
+            inviteId: invite.id,
+            externalSessionId: existingAssessment.externalSessionId,
+            userId: null,
+          },
+          data: { userId },
+        });
+      }
+
       return {
         status: "success",
         message: "Existing session restored.",
@@ -108,6 +132,7 @@ export async function startInviteDiscAssessment(_: InviteDiscState, formData: Fo
     const questions = await getDiscSessionQuestions(createdSession.sessionId);
     await createDiscAssessmentRecord({
       externalSessionId: createdSession.sessionId,
+      userId,
       inviteId: invite.id,
       companyId: invite.companyId,
       candidateName: invite.candidateName,
@@ -145,9 +170,15 @@ export async function startInviteDiscAssessment(_: InviteDiscState, formData: Fo
 }
 
 export async function submitInviteDiscAssessment(_: InviteDiscState, formData: FormData): Promise<InviteDiscState> {
+  const session = await auth();
+  const userId = session?.user?.id;
   const token = String(formData.get("token") ?? "").trim();
   const sessionId = String(formData.get("sessionId") ?? "").trim();
   const responsesRaw = String(formData.get("responses") ?? "").trim();
+
+  if (!userId) {
+    return { status: "error", message: "Log ind for at indsende besvarelser.", sessionId: "", questions: [] };
+  }
 
   if (!token || !sessionId) {
     return { status: "error", message: "Invalid submission request.", sessionId: "", questions: [] };
@@ -185,12 +216,24 @@ export async function submitInviteDiscAssessment(_: InviteDiscState, formData: F
         inviteId: invite.id,
         externalSessionId: sessionId,
       },
-      select: { id: true, status: true },
+      select: { id: true, status: true, userId: true },
     });
 
     if (!matchingAssessment || matchingAssessment.status !== "STARTED") {
       return { status: "error", message: "Session does not match invite or is already submitted.", sessionId, questions: [] };
     }
+
+    if (matchingAssessment.userId && matchingAssessment.userId !== userId) {
+      return { status: "error", message: "Invitationen tilhører en anden bruger.", sessionId: "", questions: [] };
+    }
+
+    await prisma.discAssessment.updateMany({
+      where: {
+        id: matchingAssessment.id,
+        OR: [{ userId: null }, { userId }],
+      },
+      data: { userId },
+    });
 
     await submitDiscResponses({ sessionId, responses: validatedResponses });
     logServerEvent("info", "disc_invite_complete_call_started", { sessionId });

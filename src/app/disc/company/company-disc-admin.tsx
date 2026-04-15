@@ -330,6 +330,14 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
                                         Open result
                                       </a>
                                     ) : null}
+                                    {row.latestAssessment ? (
+                                      <a
+                                        href={`/disc/company/candidates/${row.latestAssessment.id}`}
+                                        className="inline-flex h-8 items-center justify-center rounded-full border border-border bg-card px-3 text-xs font-medium hover:bg-muted"
+                                      >
+                                        Open candidate view
+                                      </a>
+                                    ) : null}
 
                                     {row.mappedStatus === "pending" ? (
                                       <form action={invalidateAction}>
