@@ -2,12 +2,16 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { auth } from "@/lib/auth";
+import { canAccessCompanyArea, canCreateCompanyProfile } from "@/lib/company-access";
 
 export const dynamic = "force-dynamic";
 
 export default async function DiscLandingPage() {
   const session = await auth();
   const isAuthenticated = Boolean(session?.user?.id);
+  const showCompanyArea = session?.user?.id
+    ? (await canAccessCompanyArea(session.user.id)) || (await canCreateCompanyProfile(session.user.id, session.user.role))
+    : false;
 
   return (
     <div className="mx-auto max-w-5xl space-y-8">
@@ -24,9 +28,11 @@ export default async function DiscLandingPage() {
               <Button asChild>
                 <Link href="/disc/overview">Mit personlige overblik</Link>
               </Button>
-              <Button asChild variant="outline">
-                <Link href="/disc/company">Virksomheds-overblik</Link>
-              </Button>
+              {showCompanyArea ? (
+                <Button asChild variant="outline">
+                  <Link href="/disc/company">Virksomheds-overblik</Link>
+                </Button>
+              ) : null}
             </>
           ) : (
             <>
@@ -55,18 +61,20 @@ export default async function DiscLandingPage() {
           </Button>
         </article>
 
-        <article className="rounded-2xl border border-border/80 bg-card p-5">
-          <h2 className="text-lg font-semibold">Virksomhed / leder</h2>
-          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-            <li>Opret virksomhed og inviter kandidater</li>
-            <li>Følg invitationer: oprettet, startet, gennemført</li>
-            <li>Åbn kandidatens resultat direkte fra overblikket</li>
-            <li>Administrér invite-links og genafsendelser</li>
-          </ul>
-          <Button asChild variant="outline" className="mt-4">
-            <Link href={isAuthenticated ? "/disc/company" : "/disc/login"}>Gå til virksomhedsflow</Link>
-          </Button>
-        </article>
+        {showCompanyArea || !isAuthenticated ? (
+          <article className="rounded-2xl border border-border/80 bg-card p-5">
+            <h2 className="text-lg font-semibold">Virksomhed / leder</h2>
+            <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+              <li>Administrér virksomhedsadgang med licens og roller</li>
+              <li>Følg invitationer: oprettet, startet, gennemført</li>
+              <li>Åbn kandidatens resultat direkte fra overblikket</li>
+              <li>Administrér invite-links og genafsendelser</li>
+            </ul>
+            <Button asChild variant="outline" className="mt-4">
+              <Link href={isAuthenticated ? "/disc/company" : "/disc/login"}>Gå til virksomhedsflow</Link>
+            </Button>
+          </article>
+        ) : null}
       </section>
 
       <section className="rounded-2xl border border-border/80 bg-card p-5">

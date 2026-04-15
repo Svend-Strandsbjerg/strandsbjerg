@@ -4,11 +4,11 @@ import { useActionState, useMemo, useState } from "react";
 
 import {
   createAssessmentInvite,
-  initialCompanyInviteActionState,
   invalidateAssessmentInvite,
   resendAssessmentInviteEmail,
   resendAssessmentResultEmail,
 } from "@/app/disc/company/actions";
+import { initialCompanyInviteActionState } from "@/app/disc/company/action-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { deriveInviteLifecycleStatus, toInviteStatusLabel, type InviteLifecycleStatus } from "@/lib/disc-invite-status";
@@ -18,6 +18,11 @@ type CompanyDiscAdminProps = {
   companies: Array<{
     id: string;
     name: string;
+    membershipRole: "COMPANY_ADMIN" | "COMPANY_VIEWER";
+    status: "ACTIVE" | "INACTIVE";
+    licenseStatus: "ACTIVE" | "TRIAL" | "INACTIVE" | "EXPIRED";
+    planTier: "FREE" | "STANDARD" | "ENTERPRISE";
+    seatLimit: number | null;
     invites: Array<{
       id: string;
       token: string;
@@ -112,6 +117,10 @@ function statusTone(status: InviteLifecycleStatus) {
   }
 }
 
+
+function canManageCompany(role: "COMPANY_ADMIN" | "COMPANY_VIEWER") {
+  return role === "COMPANY_ADMIN";
+}
 export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
   const [createState, createAction] = useActionState(createAssessmentInvite, initialCompanyInviteActionState);
   const [invalidateState, invalidateAction] = useActionState(invalidateAssessmentInvite, initialCompanyInviteActionState);
@@ -140,7 +149,7 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
       <div className="rounded-3xl border border-border/80 bg-card p-6 shadow-sm">
         <h1 className="text-2xl font-semibold tracking-tight">Virksomheds-overblik · DISC</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Administrér invitationer, følg kandidaternes status, og gå direkte til resultater.
+          Se invitationer, kandidaters status og resultater. Admins kan oprette invitationer og administrere virksomheden.
         </p>
         {infoState.status !== "idle" ? (
           <div
@@ -198,10 +207,11 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <h2 className="text-xl font-semibold tracking-tight">{company.name}</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Invitationer og kandidater i denne virksomhed.</p>
+                <p className="mt-1 text-sm text-muted-foreground">Rolle: {company.membershipRole === "COMPANY_ADMIN" ? "Company admin" : "Company viewer"} · Plan: {company.planTier} · Licens: {company.licenseStatus}</p>
               </div>
             </div>
 
+            {canManageCompany(company.membershipRole) ? (
             <form id={`create-invite-${company.id}`} action={createAction} className="mt-5 grid gap-3 md:grid-cols-4">
               <input type="hidden" name="companyId" value={company.id} />
               <Input name="candidateName" placeholder="Kandidatnavn" />
@@ -217,6 +227,11 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
                 </Button>
               </div>
             </form>
+            ) : (
+              <div className="mt-5 rounded-xl border border-border/70 bg-muted/30 p-3 text-sm text-muted-foreground">
+                Du har læseadgang som Company Viewer. Kun Company Admin kan oprette invitationer eller ændre virksomhedsdata.
+              </div>
+            )}
 
             {showFirstInviteSuccess && latestInvite ? (
               <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
@@ -320,7 +335,7 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
                                         </a>
                                       ) : null}
 
-                                      {row.lifecycleStatus === "pending" || row.lifecycleStatus === "started" ? (
+                                      {canManageCompany(company.membershipRole) && (row.lifecycleStatus === "pending" || row.lifecycleStatus === "started") ? (
                                         <form action={resendInviteAction}>
                                           <input type="hidden" name="companyId" value={company.id} />
                                           <input type="hidden" name="inviteId" value={row.id} />
@@ -330,7 +345,7 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
                                         </form>
                                       ) : null}
 
-                                      {row.lifecycleStatus === "completed" && row.latestAssessment ? (
+                                      {canManageCompany(company.membershipRole) && row.lifecycleStatus === "completed" && row.latestAssessment ? (
                                         <form action={resendAction}>
                                           <input type="hidden" name="companyId" value={company.id} />
                                           <input type="hidden" name="assessmentId" value={row.latestAssessment.id} />
@@ -340,7 +355,7 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
                                         </form>
                                       ) : null}
 
-                                      {row.lifecycleStatus === "pending" || row.lifecycleStatus === "started" ? (
+                                      {canManageCompany(company.membershipRole) && (row.lifecycleStatus === "pending" || row.lifecycleStatus === "started") ? (
                                         <form action={invalidateAction}>
                                           <input type="hidden" name="inviteId" value={row.id} />
                                           <input type="hidden" name="companyId" value={company.id} />

@@ -39,7 +39,25 @@ enum AuthMethod {
 
 enum CompanyRole {
   COMPANY_ADMIN
-  COMPANY_RECRUITER
+  COMPANY_VIEWER
+}
+
+enum CompanyStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum CompanyLicenseStatus {
+  ACTIVE
+  TRIAL
+  INACTIVE
+  EXPIRED
+}
+
+enum CompanyPlanTier {
+  FREE
+  STANDARD
+  ENTERPRISE
 }
 
 enum AssessmentInviteStatus {
@@ -82,10 +100,17 @@ model User {
 }
 
 model Company {
-  id        String   @id @default(cuid())
+  id        String               @id @default(cuid())
   name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  status    CompanyStatus        @default(ACTIVE)
+  licenseStatus CompanyLicenseStatus @default(ACTIVE)
+  planTier  CompanyPlanTier      @default(FREE)
+  seatLimit Int?
+  selfServiceCreationEnabled Boolean @default(false)
+  activatedAt DateTime?
+  deactivatedAt DateTime?
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
 
   memberships CompanyMembership[]
   invites     AssessmentInvite[]
