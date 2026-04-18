@@ -99,7 +99,7 @@ export default async function InviteDiscPage({ params }: InviteDiscPageProps) {
     versionEntitlements = resolution.visibleEntitlements;
     autoSelectedAssessmentVersionId = resolution.autoSelectedAssessmentVersionId;
   } catch (error) {
-    versionDiscoveryError = error instanceof DiscEngineError ? error.message : "Unable to load DISC assessment versions right now.";
+    versionDiscoveryError = error instanceof DiscEngineError ? error.message : "Kunne ikke hente DISC-versioner lige nu.";
   }
 
   return (
@@ -115,7 +115,7 @@ export default async function InviteDiscPage({ params }: InviteDiscPageProps) {
         <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">Sådan fungerer det</h2>
         <ol className="mt-3 space-y-2 text-sm text-muted-foreground">
           <li>1. Gennemfør testen fra denne invitation.</li>
-          <li>2. Resultatet gemmes i dit personlige /disc/overview.</li>
+          <li>2. Resultatet gemmes i dit personlige DISC-overblik.</li>
           <li>3. Den inviterende virksomhed kan også se resultatet på kandidaten.</li>
         </ol>
         {invite.createdByUser?.name || invite.createdByUser?.email ? (

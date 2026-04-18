@@ -28,25 +28,25 @@ export default async function PersonalDiscResultPage({ params }: PersonalDiscRes
   return (
     <div className="mx-auto max-w-4xl space-y-5 rounded-3xl border border-border/80 bg-card p-6 shadow-sm sm:p-8">
       <header className="space-y-2 border-b border-border/70 pb-4">
-        <h1 className="text-2xl font-semibold tracking-tight">Your DISC profile</h1>
-        <p className="text-sm text-muted-foreground">A saved personal DISC result you can revisit and export any time.</p>
+        <h1 className="text-2xl font-semibold tracking-tight">Din DISC-profil</h1>
+        <p className="text-sm text-muted-foreground">Et gemt personligt DISC-resultat, som du altid kan vende tilbage til og hente som PDF.</p>
       </header>
 
       {wasPromoGenerated ? (
         <section className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
-          <h2 className="text-base font-semibold text-emerald-900">Your free DISC profile is complete</h2>
-          <p className="mt-1 text-sm text-emerald-900/90">This result has been generated from your promo session and saved to your account.</p>
+          <h2 className="text-base font-semibold text-emerald-900">Din DISC-profil er klar</h2>
+          <p className="mt-1 text-sm text-emerald-900/90">Resultatet er gemt på din konto og kan bruges i dit personlige overblik.</p>
         </section>
       ) : null}
 
       <DiscResultPresentation
-        title="DISC profile"
+        title="DISC-profil"
         status={assessment.status}
         createdAt={assessment.createdAt}
         submittedAt={assessment.submittedAt}
         rawResponses={assessment.rawResponses}
         pdfHref={share ? `/disc/result/${share.token}/pdf` : undefined}
-        footerNote="Use this profile as a practical guide for communication, planning, and collaboration."
+        footerNote="Brug profilen som en praktisk guide til kommunikation, planlægning og samarbejde."
       />
 
       <div className="flex flex-wrap gap-2">
@@ -54,7 +54,7 @@ export default async function PersonalDiscResultPage({ params }: PersonalDiscRes
           href="/disc/overview"
           className="inline-flex h-9 items-center rounded-md border border-input bg-background px-4 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
         >
-          Back to DISC overview
+          Tilbage til DISC-overblik
         </Link>
       </div>
     </div>

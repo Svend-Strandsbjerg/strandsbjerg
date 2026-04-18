@@ -221,11 +221,11 @@ export function DiscAssessmentClient({
   const canStartAssessment = selectedAssessmentVersionId.length > 0 && !versionDiscoveryError;
   const promoStateCopy =
     promoEntryState === "ready"
-      ? "Din kampagnekredit er klar. Vælg DISC-version og start testen."
+      ? "Ekstra adgang er aktiveret. Vælg DISC-version og start testen."
       : promoEntryState === "used"
-        ? "Din tidligere kampagnekredit er brugt. Du kan stadig se historik i dit DISC-overblik."
+        ? "Din ekstra adgang er allerede brugt. Du kan stadig se historik i dit DISC-overblik."
         : promoEntryState === "redeemed"
-          ? "Din kampagne blev aktiveret. Du kan starte din DISC-test nu."
+          ? "Din adgang blev aktiveret. Du kan starte din DISC-test nu."
           : null;
 
   useEffect(() => {
@@ -263,29 +263,24 @@ export function DiscAssessmentClient({
       <PublicPageLayout>
         <PageIntro
           eyebrow="DISC"
-          title="Understand your DISC profile"
-          intro="Use DISC to assess communication and behavior preferences, then continue into personal or company-driven assessment workflows."
+          title="Mit personlige overblik"
+          intro="Tag DISC i dit eget tempo, følg dine resultater, og fortsæt nemt til virksomhedsområdet hvis du arbejder med kandidatforløb."
         >
           <div className="mt-4 flex flex-wrap gap-3">
             <Button type="button" onClick={() => setIsStartModalOpen(true)} disabled={starting || hasStartedSession || selectableEntitlements.length === 0}>
-              {starting ? "Starting session..." : hasStartedSession ? "Session active" : "Take DISC assessment"}
+              {starting ? "Starter session..." : hasStartedSession ? "Session aktiv" : "Start DISC-besvarelse"}
             </Button>
             {hasCompanyDiscAccess ? (
               <Button asChild variant="outline">
-                <Link href="/disc/company">Company assessments</Link>
+                <Link href="/disc/company">Virksomheds-overblik</Link>
               </Button>
             ) : null}
           </div>
-          {remainingPromoCredits > 0 ? (
-            <p className="mt-3 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
-              Du har {remainingPromoCredits} aktiv(e) kampagnekredit(ter). Kreditter bruges ved start af en DISC-session.
-            </p>
-          ) : null}
         </PageIntro>
 
         <SectionBlock
-          title="Personal assessment"
-          subtitle="Start a new DISC session for your own use, submit your responses, and review your recent history."
+          title="Personlig DISC"
+          subtitle="Start en ny DISC-besvarelse, indsend dine svar og følg din historik."
         >
           <ContentContainer>
             {promoStateCopy ? (
@@ -296,7 +291,7 @@ export function DiscAssessmentClient({
             {!hasStartedSession ? (
               <div className="flex flex-wrap gap-3">
                 <Button type="button" onClick={() => setIsStartModalOpen(true)} disabled={starting || selectableEntitlements.length === 0}>
-                  {starting ? "Starting session..." : "Take DISC assessment"}
+                  {starting ? "Starter session..." : "Start DISC-besvarelse"}
                 </Button>
               </div>
             ) : null}
@@ -310,16 +305,16 @@ export function DiscAssessmentClient({
             ) : null}
 
             {hasStartedSession && !hasQuestions && startState.status !== "error" ? (
-              <p className="text-sm text-muted-foreground">Loading assessment questions...</p>
+              <p className="text-sm text-muted-foreground">Henter spørgsmål...</p>
             ) : null}
             {!hasStartedSession && selectableEntitlements.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Der er ingen DISC-assessments tilgængelige for denne konto lige nu.</p>
+              <p className="text-sm text-muted-foreground">Der er ingen DISC-versioner tilgængelige for denne konto lige nu.</p>
             ) : null}
             {!hasStartedSession ? (
               <div className="rounded-xl border border-border/70 bg-muted/20 p-4 text-sm text-muted-foreground">
                 {remainingPromoCredits > 0
-                  ? `Du har ${remainingPromoCredits} gratis kampagnekredit(ter) klar. Kreditter bruges ved sessionstart.`
-                  : "Ingen aktive kampagnekreditter lige nu. Start stadig DISC med dine øvrige entitlements."}
+                  ? `Du har ${remainingPromoCredits} ekstra adgang(er) klar. De bruges ved sessionstart.`
+                  : "Ingen ekstra adgang lige nu. Du kan stadig starte den gratis DISC-besvarelse."}
               </div>
             ) : null}
 
@@ -329,7 +324,7 @@ export function DiscAssessmentClient({
                   <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Mit DISC-hjem</h3>
                   <p className="mt-1 text-sm text-muted-foreground">Dit nyeste resultat står øverst, og tidligere resultater ligger nedenfor.</p>
                   {totalAssessmentCount > assessments.length ? (
-                    <p className="mt-1 text-xs text-muted-foreground">Viser de seneste {assessments.length} af i alt {totalAssessmentCount} assessments.</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Viser de seneste {assessments.length} af i alt {totalAssessmentCount} besvarelser.</p>
                   ) : null}
                 </div>
 
@@ -339,7 +334,7 @@ export function DiscAssessmentClient({
                   <>
                     <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-3">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">Seneste assessment</p>
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">Seneste besvarelse</p>
                         <Link
                           href={`/disc/results/${assessments[0].id}`}
                           className="inline-flex h-8 items-center rounded-md border border-emerald-300 bg-white px-3 text-xs font-medium text-emerald-800 transition hover:bg-emerald-100"
@@ -363,20 +358,20 @@ export function DiscAssessmentClient({
 
                     {assessments.length > 1 ? (
                       <div className="space-y-3">
-                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Tidligere assessments</p>
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Tidligere besvarelser</p>
                         {assessments.slice(1).map((assessment, index) => (
                           <div key={assessment.id} className="flex items-center justify-between rounded-xl border border-border/70 bg-background px-3 py-3">
                             <div>
-                              <p className="text-sm font-medium text-foreground">Assessment historik #{index + 1}</p>
+                              <p className="text-sm font-medium text-foreground">Besvarelseshistorik #{index + 1}</p>
                               <p className="text-xs text-muted-foreground">
-                                {assessment.submittedAt ? "Completed result available" : `Status: ${assessment.status.toLowerCase()}`}
+                                {assessment.submittedAt ? "Resultat klart" : `Status: ${assessment.status.toLowerCase()}`}
                               </p>
                             </div>
                             <Link
                               href={`/disc/results/${assessment.id}`}
                               className="inline-flex h-8 items-center rounded-md border border-input bg-background px-3 text-xs font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
                             >
-                              Open result
+                              Åbn resultat
                             </Link>
                           </div>
                         ))}
@@ -391,19 +386,19 @@ export function DiscAssessmentClient({
 
         {hasCompanyDiscAccess ? (
           <SectionBlock
-            title="Company assessments"
-            subtitle="Review company DISC assessments with role-based access for company admins and viewers."
+            title="Virksomheds-DISC"
+            subtitle="Se virksomhedens DISC-besvarelser med rollebaseret adgang for Company Admin og Company Viewer."
           >
             <ContentContainer>
               <p className="text-sm text-muted-foreground">
-                Use the company area to review submitted assessments. Company admins can additionally create and manage invites.
+                Brug virksomhedsområdet til at gennemgå indsendte besvarelser. Company Admin kan også oprette og administrere invitationer.
               </p>
               <div className="flex flex-wrap gap-3">
                 <Button asChild variant="outline">
-                  <Link href="/disc/company">Go to invites</Link>
+                  <Link href="/disc/company">Gå til invitationer</Link>
                 </Button>
                 <Button asChild variant="outline">
-                  <Link href="/disc/company">Go to company assessments</Link>
+                  <Link href="/disc/company">Gå til virksomheds-overblik</Link>
                 </Button>
               </div>
             </ContentContainer>
@@ -419,7 +414,7 @@ export function DiscAssessmentClient({
       {isStartModalOpen && !hasStartedSession ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-xl">
-            <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">DISC assessment</p>
+            <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">DISC-besvarelse</p>
             <h2 className="mt-2 text-xl font-semibold">Svar intuitivt og ærligt</h2>
             <p className="mt-2 text-sm text-muted-foreground">Du får ét spørgsmål ad gangen. Vælg det svar der føles mest rigtigt med det samme.</p>
             <div className="mt-4">
@@ -453,7 +448,7 @@ export function DiscAssessmentClient({
               </Button>
               <form action={startAction}>
                 <input type="hidden" name="assessmentVersionId" value={selectedAssessmentVersionId} />
-                <Button type="submit" disabled={starting || !canStartAssessment}>{starting ? "Starting..." : "Start test"}</Button>
+                <Button type="submit" disabled={starting || !canStartAssessment}>{starting ? "Starter..." : "Start test"}</Button>
               </form>
             </div>
           </div>
@@ -469,7 +464,7 @@ export function DiscAssessmentClient({
                 onClick={() => setIsMobileTimelineOpen((open) => !open)}
                 className="flex w-full items-center justify-between text-left"
               >
-                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Answer review</span>
+                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Svaroversigt</span>
                 <span className="text-xs text-muted-foreground">{answeredCount}/{questions.length}</span>
               </button>
               {isMobileTimelineOpen ? (
@@ -498,7 +493,7 @@ export function DiscAssessmentClient({
               <aside className={cn("sticky top-8 hidden pr-2 md:block", isFinalOverviewVisible ? "md:hidden" : "")}>
                 <p className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Oversigt</p>
                 <div className="rounded-2xl border border-border/60 bg-muted/10 p-3">
-                  <p className="mb-3 text-[11px] text-muted-foreground">Viser {activeQuestionIndex + 1} · Progress {Math.max(highestAnsweredQuestionIndex + 1, 0)}/{questions.length}</p>
+                  <p className="mb-3 text-[11px] text-muted-foreground">Viser {activeQuestionIndex + 1} · Fremdrift {Math.max(highestAnsweredQuestionIndex + 1, 0)}/{questions.length}</p>
                   <div className="grid grid-cols-2 gap-2">
                     {timelineItems.map((item) => (
                       <button
@@ -588,7 +583,7 @@ export function DiscAssessmentClient({
                       ) : null}
                       {isCompletingAssessment || submitting ? (
                         <div className="mt-8 space-y-1 text-sm text-muted-foreground">
-                          <p>Processing your DISC profile...</p>
+                      <p>Behandler din DISC-profil...</p>
                           <p className="text-xs">Vi samler dine svar og gør resultatet klar.</p>
                         </div>
                       ) : (

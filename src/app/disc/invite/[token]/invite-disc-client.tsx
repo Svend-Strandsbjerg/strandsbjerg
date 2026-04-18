@@ -73,7 +73,7 @@ function CopyResultLinkButton({ resultLink }: { resultLink: string }) {
         setTimeout(() => setCopied(false), 1500);
       }}
     >
-      {copied ? "Copied" : "Copy result link"}
+      {copied ? "Kopieret" : "Kopiér resultatlink"}
     </Button>
   );
 }
@@ -203,7 +203,7 @@ export function InviteDiscClient({
           submittedAt={latestAssessment.submittedAt}
           rawResponses={latestAssessment.rawResponses}
           identityLabel={candidateLabel}
-          emptyMessage="This invite was completed, but the result payload is incomplete."
+          emptyMessage="Invitationen er gennemført, men resultatdata er ufuldstændige."
         />
 
         {latestAssessment.resultLink ? (
@@ -213,11 +213,11 @@ export function InviteDiscClient({
               href={latestAssessment.resultLink}
               className="inline-flex h-8 items-center justify-center rounded-full border border-border bg-card px-5 py-2.5 text-xs font-medium text-foreground transition hover:bg-muted"
             >
-              Open shared result
+              Åbn delt resultat
             </a>
           </div>
         ) : (
-          <p className="text-xs text-muted-foreground">A permanent result link will appear once processing completes.</p>
+          <p className="text-xs text-muted-foreground">Et permanent resultatlink vises, når behandlingen er færdig.</p>
         )}
 
         <div className="flex flex-wrap gap-2">
@@ -239,15 +239,15 @@ export function InviteDiscClient({
   }
 
   if (inviteState === "completed") {
-    return <p className="text-sm text-muted-foreground">This invite has already been completed and can no longer be used.</p>;
+    return <p className="text-sm text-muted-foreground">Invitationen er allerede gennemført og kan ikke bruges igen.</p>;
   }
 
   if (inviteState === "expired") {
-    return <p className="text-sm text-destructive">This invite has expired. Please request a new invite.</p>;
+    return <p className="text-sm text-destructive">Invitationen er udløbet. Bed om en ny invitation.</p>;
   }
 
   if (inviteState === "invalidated") {
-    return <p className="text-sm text-destructive">This invite was invalidated by the company.</p>;
+    return <p className="text-sm text-destructive">Invitationen er lukket af virksomheden.</p>;
   }
 
   const progressPercent = hasQuestions ? ((activeQuestionIndex + 1) / questions.length) * 100 : 0;
@@ -270,7 +270,7 @@ export function InviteDiscClient({
 
         {!hasStartedSession ? (
           <Button type="button" onClick={() => setIsStartModalOpen(true)} disabled={starting || selectableEntitlements.length === 0}>
-            {starting ? "Starting session..." : "Take assessment"}
+            {starting ? "Starter session..." : "Start besvarelse"}
           </Button>
         ) : null}
 
@@ -283,7 +283,7 @@ export function InviteDiscClient({
         ) : null}
 
         {hasStartedSession && !hasQuestions && startState.status !== "error" ? (
-          <p className="text-sm text-muted-foreground">Loading assessment questions...</p>
+          <p className="text-sm text-muted-foreground">Henter spørgsmål...</p>
         ) : null}
         {!hasStartedSession && selectableEntitlements.length === 0 ? (
           <p className="text-sm text-muted-foreground">Ingen DISC-assessments er tilgængelige for denne invitation lige nu.</p>
@@ -299,7 +299,7 @@ export function InviteDiscClient({
       {isStartModalOpen && !hasStartedSession ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-xl">
-            <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">DISC assessment</p>
+            <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">DISC-besvarelse</p>
             <h2 className="mt-2 text-xl font-semibold">Svar intuitivt og ærligt</h2>
             <p className="mt-2 text-sm text-muted-foreground">Du får ét spørgsmål ad gangen. Vælg det svar der føles mest rigtigt med det samme.</p>
             <div className="mt-4">
@@ -334,7 +334,7 @@ export function InviteDiscClient({
               <form action={startAction}>
                 <input type="hidden" name="token" value={token} />
                 <input type="hidden" name="assessmentVersionId" value={selectedAssessmentVersionId} />
-                <Button type="submit" disabled={starting || !canStartAssessment}>{starting ? "Starting..." : "Start test"}</Button>
+                <Button type="submit" disabled={starting || !canStartAssessment}>{starting ? "Starter..." : "Start test"}</Button>
               </form>
             </div>
           </div>
@@ -350,8 +350,8 @@ export function InviteDiscClient({
                 onClick={() => setIsMobileTimelineOpen((open) => !open)}
                 className="flex w-full items-center justify-between text-left"
               >
-                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Answer review</span>
-                <span className="text-xs text-muted-foreground">{timelineItems.length} shown</span>
+                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Svaroversigt</span>
+                <span className="text-xs text-muted-foreground">{timelineItems.length} vist</span>
               </button>
               {isMobileTimelineOpen ? (
                 <div className="mt-3 space-y-2">
@@ -379,7 +379,7 @@ export function InviteDiscClient({
 
             <div className="grid min-h-0 flex-1 gap-8 md:grid-cols-[240px_minmax(0,1fr)_240px] md:items-start">
               <aside className="sticky top-8 hidden max-h-[calc(100vh-4rem)] overflow-y-auto pr-2 md:block">
-                <p className="mb-4 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Answer timeline</p>
+                <p className="mb-4 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Svar-tidslinje</p>
                 <div className="space-y-2">
                   {timelineItems.map((item, itemIndex) => (
                     <button
@@ -448,12 +448,12 @@ export function InviteDiscClient({
                       </div>
                     </div>
                   ) : (
-                    <p className="mt-4 text-sm text-destructive">Question options are missing. Please restart your session.</p>
+                    <p className="mt-4 text-sm text-destructive">Svarmuligheder mangler. Start venligst sessionen igen.</p>
                   )}
 
                   {isCompletingAssessment || submitting ? (
                     <div className="mt-8 space-y-1 text-sm text-muted-foreground">
-                      <p>Processing your DISC profile...</p>
+                      <p>Behandler din DISC-profil...</p>
                       <p className="text-xs">Vi samler dine svar og gør resultatet klar.</p>
                     </div>
                   ) : (

@@ -66,6 +66,28 @@ export function inferDiscVersionCategory(version: DiscAssessmentVersion): DiscVe
   return "unknown";
 }
 
+function selectBaselineFreeVersionId(versions: DiscAssessmentVersion[]): string | null {
+  const explicitFree = versions.find((version) => inferDiscVersionCategory(version) === "free");
+  if (explicitFree) {
+    return explicitFree.id;
+  }
+
+  const defaultVersion = versions.find((version) => version.isDefault);
+  if (defaultVersion) {
+    return defaultVersion.id;
+  }
+
+  const byQuestionCount = [...versions]
+    .filter((version) => typeof version.expectedQuestionCount === "number" && version.expectedQuestionCount > 0)
+    .sort((left, right) => (left.expectedQuestionCount ?? Number.MAX_SAFE_INTEGER) - (right.expectedQuestionCount ?? Number.MAX_SAFE_INTEGER))[0];
+
+  if (byQuestionCount) {
+    return byQuestionCount.id;
+  }
+
+  return versions[0]?.id ?? null;
+}
+
 export function resolveDiscReportTierFromCategory(category: DiscVersionCategory): DiscReportTier {
   if (category === "standard" || category === "deep") {
     return category;
@@ -292,8 +314,10 @@ function resolveEffectivePolicy(context: DiscVersionEntitlementContext, inputs: 
 }
 
 export function resolveDiscVersionEntitlements(input: DiscVersionEntitlementContext & { discoveredVersions: DiscAssessmentVersion[]; policy: EffectiveEntitlementPolicy }): DiscVersionEntitlementResolution {
+  const baselineFreeVersionId = selectBaselineFreeVersionId(input.discoveredVersions);
   const entitlements = input.discoveredVersions.map((version) => {
-    const category = inferDiscVersionCategory(version);
+    const inferredCategory = inferDiscVersionCategory(version);
+    const category = inferredCategory === "unknown" && baselineFreeVersionId === version.id ? "free" : inferredCategory;
     const policy = toEntitlementPolicy(input, input.policy, category);
 
     return {

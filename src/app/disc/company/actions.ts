@@ -491,3 +491,68 @@ export async function updateCompanyDiscTierAccess(
     return { status: "error", message: "Could not update DISC tier access." };
   }
 }
+
+export async function updateUserDiscTierOverride(
+  _: CompanyInviteActionState,
+  formData: FormData,
+): Promise<CompanyInviteActionState> {
+  const user = await requireUser();
+  const companyId = String(formData.get("companyId") ?? "").trim();
+  const targetUserId = String(formData.get("targetUserId") ?? "").trim();
+  const overrideRaw = String(formData.get("discMaxTierOverride") ?? "").trim().toUpperCase();
+
+  if (!companyId || !targetUserId) {
+    return { status: "error", message: "Ugyldig anmodning om brugeradgang." };
+  }
+
+  const parsedOverride = overrideRaw === "INHERIT" ? null : parseDiscTierAccess(overrideRaw);
+  if (overrideRaw !== "INHERIT" && !parsedOverride) {
+    return { status: "error", message: "Ugyldigt DISC-adgangsniveau." };
+  }
+
+  try {
+    await requireCompanyAdmin(user.id, companyId);
+
+    const membership = await prisma.companyMembership.findUnique({
+      where: {
+        userId_companyId: {
+          userId: targetUserId,
+          companyId,
+        },
+      },
+      select: { userId: true },
+    });
+
+    if (!membership) {
+      return { status: "error", message: "Brugeren er ikke medlem af virksomheden." };
+    }
+
+    await prisma.user.update({
+      where: { id: targetUserId },
+      data: {
+        discMaxTierOverride: parsedOverride,
+      },
+      select: { id: true },
+    });
+
+    logServerEvent("info", "disc_user_tier_override_updated", {
+      companyId,
+      targetUserId,
+      updatedByUserId: user.id,
+      discMaxTierOverride: parsedOverride,
+    });
+
+    revalidatePath("/disc/company");
+    revalidatePath("/disc/overview");
+
+    return { status: "success", message: "Brugerens DISC-adgang er opdateret." };
+  } catch (error) {
+    logServerEvent("error", "disc_user_tier_override_update_failed", {
+      companyId,
+      targetUserId,
+      userId: user.id,
+      error,
+    });
+    return { status: "error", message: "Kunne ikke opdatere brugerens DISC-adgang." };
+  }
+}

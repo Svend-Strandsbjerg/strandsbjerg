@@ -11,7 +11,7 @@ type DiscVersionSelectorProps = {
 };
 
 function buildVersionDescription(version: DiscVersionEntitlement["version"]) {
-  return version.description ?? version.intendedUse ?? "Assessment details are provided by the DISC engine.";
+  return version.description ?? version.intendedUse ?? "Versionsdetaljer leveres af DISC-motoren.";
 }
 
 function lockReasonCopy(reason: DiscVersionEntitlement["reason"]) {

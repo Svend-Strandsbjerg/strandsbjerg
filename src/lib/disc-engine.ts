@@ -85,6 +85,18 @@ function sanitizeForLog(value: unknown, depth = 0): unknown {
   return String(value);
 }
 
+function serializeForLog(value: unknown): string | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  try {
+    return JSON.stringify(sanitizeForLog(value));
+  } catch {
+    return String(value);
+  }
+}
+
 function getRequiredEnv(name: "DISC_ENGINE_BASE_URL" | "DISC_ENGINE_API_KEY") {
   const value = process.env[name];
 
@@ -536,7 +548,14 @@ type CreateDiscSessionInput = {
   inviteToken?: string | null;
 };
 
-const DISCOVERY_ENDPOINT_CANDIDATES = ["/versions", "/discovery"] as const;
+const DEFAULT_DISCOVERY_PATHS = [
+  "/disc/assessment-versions",
+  "/disc/discovery",
+  "/assessment-versions",
+  "/assessments/versions",
+  "/versions",
+  "/discovery",
+] as const;
 
 let cachedDiscoveredVersions: DiscAssessmentVersion[] | null = null;
 let cachedDiscoveredVersionsAt = 0;
@@ -545,8 +564,23 @@ let cachedDiscoveryError: { at: number; message: string } | null = null;
 const DISCOVERY_CACHE_TTL_MS = 60_000;
 const DISCOVERY_ERROR_COOLDOWN_MS = 15_000;
 
+function getDiscoveryEndpointCandidates() {
+  const configuredPaths = process.env.DISC_ENGINE_DISCOVERY_PATHS
+    ?.split(",")
+    .map((path) => path.trim())
+    .filter(Boolean);
+
+  if (configuredPaths && configuredPaths.length > 0) {
+    return configuredPaths;
+  }
+
+  return [...DEFAULT_DISCOVERY_PATHS];
+}
+
 export async function getDiscAssessmentVersions(): Promise<DiscAssessmentVersion[]> {
   const now = Date.now();
+  const baseUrl = getRequiredEnv("DISC_ENGINE_BASE_URL");
+  const discoveryCandidates = getDiscoveryEndpointCandidates();
 
   if (cachedDiscoveredVersions && now - cachedDiscoveredVersionsAt < DISCOVERY_CACHE_TTL_MS) {
     return cachedDiscoveredVersions;
@@ -557,12 +591,15 @@ export async function getDiscAssessmentVersions(): Promise<DiscAssessmentVersion
   }
 
   logServerEvent("info", "disc_version_discovery_started", {
-    endpointCandidates: DISCOVERY_ENDPOINT_CANDIDATES,
+    endpointCandidates: discoveryCandidates,
+    attemptedCandidates: discoveryCandidates.map((path) => getUrlLogContext(baseUrl, path)),
   });
 
   let lastError: DiscEngineError | null = null;
 
-  for (const path of DISCOVERY_ENDPOINT_CANDIDATES) {
+  for (const path of discoveryCandidates) {
+    const urlContext = getUrlLogContext(baseUrl, path);
+
     try {
       const result = await discEngineGetRequest<unknown>(path);
       const versions = extractAssessmentVersions(result);
@@ -570,8 +607,11 @@ export async function getDiscAssessmentVersions(): Promise<DiscAssessmentVersion
       if (versions.length === 0) {
         logServerEvent("error", "disc_version_discovery_empty", {
           attemptedPath: path,
+          resolvedPathname: urlContext.resolvedPathname,
+          attemptedUrl: urlContext.url,
           hasResult: Boolean(result),
           resultKeys: result && typeof result === "object" ? Object.keys(result as Record<string, unknown>).slice(0, 20) : [],
+          resultBody: serializeForLog(result),
         });
         throw new DiscEngineError(`disc-engine ${path} returned no assessment versions.`);
       }
@@ -582,6 +622,8 @@ export async function getDiscAssessmentVersions(): Promise<DiscAssessmentVersion
 
       logServerEvent("info", "disc_version_discovery_succeeded", {
         path,
+        resolvedPathname: urlContext.resolvedPathname,
+        attemptedUrl: urlContext.url,
         versionCount: versions.length,
         versions: versions.map((version) => ({
           id: version.id,
@@ -598,8 +640,11 @@ export async function getDiscAssessmentVersions(): Promise<DiscAssessmentVersion
       lastError = normalizedError;
       logServerEvent("warn", "disc_version_discovery_attempt_failed", {
         attemptedPath: path,
+        resolvedPathname: urlContext.resolvedPathname,
+        attemptedUrl: urlContext.url,
         status: normalizedError.status ?? null,
         message: normalizedError.message,
+        details: serializeForLog(normalizedError.details),
       });
     }
   }
@@ -611,9 +656,11 @@ export async function getDiscAssessmentVersions(): Promise<DiscAssessmentVersion
   };
 
   logServerEvent("error", "disc_version_discovery_failed", {
-    attemptedPaths: DISCOVERY_ENDPOINT_CANDIDATES,
+    attemptedPaths: discoveryCandidates,
+    attemptedCandidates: discoveryCandidates.map((path) => getUrlLogContext(baseUrl, path)),
     lastStatus: lastError?.status ?? null,
     lastMessage: lastError?.message ?? null,
+    lastDetails: serializeForLog(lastError?.details),
   });
 
   throw new DiscEngineError(finalMessage, lastError?.status, lastError?.details);
