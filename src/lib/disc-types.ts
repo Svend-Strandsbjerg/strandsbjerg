@@ -26,6 +26,7 @@ export type DiscAssessmentVersion = {
 };
 
 export type DiscVersionCategory = "free" | "standard" | "deep" | "unknown";
+export type DiscReportTier = "free" | "standard" | "deep";
 
 export type DiscVersionEntitlementStatus = "selectable" | "locked" | "hidden";
 
