@@ -1,4 +1,4 @@
-import { buildDiscProfileSummary, buildDiscResultViewModel, calculateDiscPosition } from "@/lib/disc-result-insights";
+import { buildDiscProfilePresentation, buildDiscResultViewModel, calculateDiscPosition } from "@/lib/disc-result-insights";
 import { cn } from "@/lib/utils";
 
 type DiscResultPresentationProps = {
@@ -7,12 +7,12 @@ type DiscResultPresentationProps = {
   createdAt: Date;
   submittedAt: Date | null;
   rawResponses: unknown;
-  externalSessionId?: string;
   identityLabel?: string;
   companyLabel?: string;
   emptyMessage?: string;
   footerNote?: string;
   pdfHref?: string;
+  variant?: "full" | "compact";
 };
 
 function formatDate(value: Date | null) {
@@ -39,7 +39,7 @@ function formatPercent(value: number) {
   return `${Math.round(((value + 1) / 2) * 100)}%`;
 }
 
-function DiscSquare({ x, y }: { x: number; y: number }) {
+function DiscFigure({ x, y }: { x: number; y: number }) {
   return (
     <div className="mx-auto w-full max-w-[22rem]">
       <div className="relative aspect-square overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm">
@@ -66,23 +66,38 @@ function DiscSquare({ x, y }: { x: number; y: number }) {
   );
 }
 
+function DiscWeighting({ scores }: { scores: Record<"D" | "I" | "S" | "C", number | null> }) {
+  return (
+    <div className="rounded-xl border border-border/60 bg-muted/20 p-3">
+      <h5 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Weighting</h5>
+      <ul className="mt-3 space-y-2 text-sm">
+        <li className="flex items-center justify-between"><span className="text-muted-foreground">D</span><span className="font-semibold text-foreground">{formatDimensionValue(scores.D)}</span></li>
+        <li className="flex items-center justify-between"><span className="text-muted-foreground">I</span><span className="font-semibold text-foreground">{formatDimensionValue(scores.I)}</span></li>
+        <li className="flex items-center justify-between"><span className="text-muted-foreground">S</span><span className="font-semibold text-foreground">{formatDimensionValue(scores.S)}</span></li>
+        <li className="flex items-center justify-between"><span className="text-muted-foreground">C</span><span className="font-semibold text-foreground">{formatDimensionValue(scores.C)}</span></li>
+      </ul>
+    </div>
+  );
+}
+
 export function DiscResultPresentation({
   title,
   status,
   createdAt,
   submittedAt,
   rawResponses,
-  externalSessionId,
   identityLabel,
   companyLabel,
   emptyMessage,
   footerNote,
   pdfHref,
+  variant = "full",
 }: DiscResultPresentationProps) {
   const viewModel = buildDiscResultViewModel(rawResponses);
-  const profileSummary = buildDiscProfileSummary(viewModel);
+  const profilePresentation = buildDiscProfilePresentation(viewModel);
   const placement = calculateDiscPosition(viewModel.dimensionScores);
   const completionDate = submittedAt ?? (status === "SUBMITTED" ? createdAt : null);
+  const isCompact = variant === "compact";
 
   if (status !== "SUBMITTED") {
     return (
@@ -105,35 +120,30 @@ export function DiscResultPresentation({
   return (
     <div className="space-y-4 rounded-2xl border border-border/80 bg-card p-4 sm:p-5">
       <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
-        <h3 className="text-lg font-semibold tracking-tight">{title}</h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {identityLabel ? `${identityLabel} · ` : ""}Completed on {formatDate(completionDate)}
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{title}</p>
+        <h3 className="mt-2 text-xl font-semibold tracking-tight">{profilePresentation.profileTitle}</h3>
+        <p className="mt-1 text-sm font-medium text-foreground/90">{profilePresentation.profileLabel}</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {identityLabel ? `${identityLabel} · ` : ""}Generated on {formatDate(completionDate)}
         </p>
         {companyLabel ? <p className="mt-1 text-xs text-muted-foreground/90">Shared by {companyLabel}</p> : null}
       </div>
 
       <section className="rounded-xl border border-border/70 p-4 sm:p-5">
-        <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">DISC overview</h4>
+        <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">DISC figure</h4>
         <div className="mt-4 grid gap-5 lg:grid-cols-[13rem_minmax(0,1fr)] lg:items-center">
-          <div className="rounded-xl border border-border/60 bg-muted/20 p-3">
-            <h5 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Vægtning</h5>
-            <ul className="mt-3 space-y-2 text-sm">
-              <li className="flex items-center justify-between"><span className="text-muted-foreground">D</span><span className="font-semibold text-foreground">{formatDimensionValue(viewModel.dimensionScores.D)}</span></li>
-              <li className="flex items-center justify-between"><span className="text-muted-foreground">I</span><span className="font-semibold text-foreground">{formatDimensionValue(viewModel.dimensionScores.I)}</span></li>
-              <li className="flex items-center justify-between"><span className="text-muted-foreground">S</span><span className="font-semibold text-foreground">{formatDimensionValue(viewModel.dimensionScores.S)}</span></li>
-              <li className="flex items-center justify-between"><span className="text-muted-foreground">C</span><span className="font-semibold text-foreground">{formatDimensionValue(viewModel.dimensionScores.C)}</span></li>
-            </ul>
-          </div>
-          <DiscSquare x={placement.x} y={placement.y} />
+          <DiscWeighting scores={viewModel.dimensionScores} />
+          <DiscFigure x={placement.x} y={placement.y} />
         </div>
       </section>
 
       <section className="rounded-xl border border-border/70 p-4">
         <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Profile summary</h4>
-        <p className="mt-3 text-sm leading-6 text-muted-foreground">{profileSummary}</p>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">{profilePresentation.summary}</p>
+        {!isCompact ? <p className="mt-3 text-xs leading-5 text-muted-foreground">{profilePresentation.explanatoryNote}</p> : null}
       </section>
 
-      {pdfHref ? (
+      {!isCompact && pdfHref ? (
         <div className="px-1">
           <a
             href={pdfHref}

@@ -178,6 +178,10 @@ export function DiscAssessmentClient({
       setIsAssessmentModalOpen(false);
       setHasEnteredFinalOverview(false);
       setIsStartModalOpen(false);
+      if (submitState.resultAssessmentId) {
+        router.push(`/disc/results/${submitState.resultAssessmentId}`);
+        return;
+      }
       router.refresh();
     }
 
@@ -334,7 +338,15 @@ export function DiscAssessmentClient({
                 ) : (
                   <>
                     <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">Seneste assessment</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">Seneste assessment</p>
+                        <Link
+                          href={`/disc/results/${assessments[0].id}`}
+                          className="inline-flex h-8 items-center rounded-md border border-emerald-300 bg-white px-3 text-xs font-medium text-emerald-800 transition hover:bg-emerald-100"
+                        >
+                          Åbn fuldt resultat
+                        </Link>
+                      </div>
                       <div className="mt-2">
                         <DiscResultPresentation
                           title="Seneste DISC-resultat"
@@ -342,9 +354,9 @@ export function DiscAssessmentClient({
                           createdAt={assessments[0].createdAt}
                           submittedAt={assessments[0].submittedAt}
                           rawResponses={assessments[0].rawResponses}
-                          externalSessionId={assessments[0].externalSessionId}
                           pdfHref={assessments[0].resultShare ? `/disc/result/${assessments[0].resultShare.token}/pdf` : undefined}
                           emptyMessage="Dette resultat mangler stadig detaljer."
+                          variant="compact"
                         />
                       </div>
                     </div>
@@ -353,17 +365,20 @@ export function DiscAssessmentClient({
                       <div className="space-y-3">
                         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Tidligere assessments</p>
                         {assessments.slice(1).map((assessment, index) => (
-                          <DiscResultPresentation
-                            key={assessment.id}
-                            title={`Assessment historik #${index + 1}`}
-                            status={assessment.status}
-                            createdAt={assessment.createdAt}
-                            submittedAt={assessment.submittedAt}
-                            rawResponses={assessment.rawResponses}
-                            externalSessionId={assessment.externalSessionId}
-                            pdfHref={assessment.resultShare ? `/disc/result/${assessment.resultShare.token}/pdf` : undefined}
-                            emptyMessage="Dette resultat mangler stadig detaljer."
-                          />
+                          <div key={assessment.id} className="flex items-center justify-between rounded-xl border border-border/70 bg-background px-3 py-3">
+                            <div>
+                              <p className="text-sm font-medium text-foreground">Assessment historik #{index + 1}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {assessment.submittedAt ? "Completed result available" : `Status: ${assessment.status.toLowerCase()}`}
+                              </p>
+                            </div>
+                            <Link
+                              href={`/disc/results/${assessment.id}`}
+                              className="inline-flex h-8 items-center rounded-md border border-input bg-background px-3 text-xs font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+                            >
+                              Open result
+                            </Link>
+                          </div>
                         ))}
                       </div>
                     ) : null}

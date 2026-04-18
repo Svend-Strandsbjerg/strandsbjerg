@@ -5,6 +5,7 @@ export type DiscFlowState = {
   message: string;
   sessionId: string;
   questions: DiscQuestion[];
+  resultAssessmentId?: string;
 };
 
 export const initialDiscFlowState: DiscFlowState = {

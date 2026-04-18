@@ -73,7 +73,6 @@ export default async function DiscResultSharePage({ params }: DiscResultSharePag
         createdAt={assessment.createdAt}
         submittedAt={assessment.submittedAt}
         rawResponses={assessment.rawResponses}
-        externalSessionId={assessment.externalSessionId}
         identityLabel={candidateLabel}
         companyLabel={companyName}
         footerNote="This assessment was generated using the DISC framework."

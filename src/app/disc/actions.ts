@@ -422,7 +422,7 @@ export async function submitDiscAssessmentResponses(_: DiscFlowState, formData: 
       responses: validatedResponses,
       result: JSON.parse(JSON.stringify(resultPayload)) as Prisma.InputJsonValue,
     } satisfies Prisma.InputJsonValue;
-    await markDiscAssessmentSubmitted({
+    const submittedAssessment = await markDiscAssessmentSubmitted({
       externalSessionId: sessionId,
       rawResponses: persistedPayload,
     });
@@ -447,6 +447,7 @@ export async function submitDiscAssessmentResponses(_: DiscFlowState, formData: 
       message: "Responses submitted successfully.",
       sessionId,
       questions: [],
+      resultAssessmentId: submittedAssessment.id,
     };
   } catch (error) {
     logServerEvent("error", "disc_flow_responses_submit_failed", { userId, sessionId, error });
