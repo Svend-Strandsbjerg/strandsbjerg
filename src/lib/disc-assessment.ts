@@ -10,6 +10,7 @@ type CreateAssessmentInput = {
   assessmentVersionId: string;
   userId?: string | null;
   inviteId?: string | null;
+  promoRedemptionId?: string | null;
   companyId?: string | null;
   candidateName?: string | null;
   candidateEmail?: string | null;
@@ -21,6 +22,7 @@ export async function createDiscAssessmentRecord(input: CreateAssessmentInput) {
     update: {
       userId: input.userId ?? null,
       inviteId: input.inviteId ?? null,
+      promoRedemptionId: input.promoRedemptionId ?? null,
       companyId: input.companyId ?? null,
       candidateName: input.candidateName ?? null,
       candidateEmail: input.candidateEmail ?? null,
@@ -32,6 +34,7 @@ export async function createDiscAssessmentRecord(input: CreateAssessmentInput) {
       assessmentVersionId: input.assessmentVersionId,
       userId: input.userId ?? null,
       inviteId: input.inviteId ?? null,
+      promoRedemptionId: input.promoRedemptionId ?? null,
       companyId: input.companyId ?? null,
       candidateName: input.candidateName ?? null,
       candidateEmail: input.candidateEmail ?? null,
