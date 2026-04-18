@@ -101,6 +101,30 @@ function buildDiscEngineUrl(baseUrl: string, path: string) {
   return new URL(normalizedPath, normalizedBase).toString();
 }
 
+function getUrlLogContext(baseUrl: string, path: string) {
+  const url = buildDiscEngineUrl(baseUrl, path);
+
+  try {
+    const parsedBase = new URL(baseUrl);
+    const parsedUrl = new URL(url);
+    return {
+      url,
+      path,
+      resolvedPathname: parsedUrl.pathname,
+      baseUrlHost: parsedBase.host,
+      baseUrlPathname: parsedBase.pathname,
+    };
+  } catch {
+    return {
+      url,
+      path,
+      resolvedPathname: "invalid",
+      baseUrlHost: "invalid",
+      baseUrlPathname: "invalid",
+    };
+  }
+}
+
 export function validateDiscResponses(payload: unknown): DiscResponseInput[] {
   if (!Array.isArray(payload) || payload.length === 0) {
     throw new DiscEngineError("Responses must be a non-empty array");
@@ -149,28 +173,24 @@ export function validateDiscResponses(payload: unknown): DiscResponseInput[] {
 async function discEngineRequest<TResponse>(path: string, payload: unknown): Promise<TResponse> {
   const apiKey = getRequiredEnv("DISC_ENGINE_API_KEY");
   const baseUrl = getRequiredEnv("DISC_ENGINE_BASE_URL");
-  const url = buildDiscEngineUrl(baseUrl, path);
+  const urlContext = getUrlLogContext(baseUrl, path);
 
   let response: Response;
 
   logServerEvent("info", "disc_engine_request_payload", {
-    url,
-    path,
+    url: urlContext.url,
+    path: urlContext.path,
+    resolvedPathname: urlContext.resolvedPathname,
     method: "POST",
-    baseUrlHost: (() => {
-      try {
-        return new URL(baseUrl).host;
-      } catch {
-        return "invalid";
-      }
-    })(),
+    baseUrlHost: urlContext.baseUrlHost,
+    baseUrlPathname: urlContext.baseUrlPathname,
     hasApiKey: Boolean(apiKey),
     apiKeyLength: apiKey.length,
     payload: sanitizeForLog(payload),
   });
 
   try {
-    response = await fetch(url, {
+    response = await fetch(urlContext.url, {
       method: "POST",
       headers: {
         "x-api-key": apiKey,
@@ -180,7 +200,13 @@ async function discEngineRequest<TResponse>(path: string, payload: unknown): Pro
       cache: "no-store",
     });
   } catch (error) {
-    logServerEvent("error", "disc_engine_request_failed", { path, error });
+    logServerEvent("error", "disc_engine_request_failed", {
+      path: urlContext.path,
+      resolvedPathname: urlContext.resolvedPathname,
+      baseUrlHost: urlContext.baseUrlHost,
+      baseUrlPathname: urlContext.baseUrlPathname,
+      error,
+    });
     throw new DiscEngineError(`Failed to call disc-engine ${path}`);
   }
 
@@ -192,14 +218,18 @@ async function discEngineRequest<TResponse>(path: string, payload: unknown): Pro
   }
 
   logServerEvent("info", "disc_engine_response_payload", {
-    path,
+    path: urlContext.path,
+    resolvedPathname: urlContext.resolvedPathname,
     status: response.status,
     body: sanitizeForLog(parsedBody),
   });
 
   if (!response.ok) {
     logServerEvent("error", "disc_engine_non_ok_response", {
-      path,
+      path: urlContext.path,
+      resolvedPathname: urlContext.resolvedPathname,
+      baseUrlHost: urlContext.baseUrlHost,
+      baseUrlPathname: urlContext.baseUrlPathname,
       status: response.status,
       hasBody: Boolean(parsedBody),
     });
@@ -212,27 +242,23 @@ async function discEngineRequest<TResponse>(path: string, payload: unknown): Pro
 async function discEngineGetRequest<TResponse>(path: string): Promise<TResponse> {
   const apiKey = getRequiredEnv("DISC_ENGINE_API_KEY");
   const baseUrl = getRequiredEnv("DISC_ENGINE_BASE_URL");
-  const url = buildDiscEngineUrl(baseUrl, path);
+  const urlContext = getUrlLogContext(baseUrl, path);
 
   let response: Response;
 
   logServerEvent("info", "disc_engine_request_payload", {
-    url,
-    path,
+    url: urlContext.url,
+    path: urlContext.path,
+    resolvedPathname: urlContext.resolvedPathname,
     method: "GET",
-    baseUrlHost: (() => {
-      try {
-        return new URL(baseUrl).host;
-      } catch {
-        return "invalid";
-      }
-    })(),
+    baseUrlHost: urlContext.baseUrlHost,
+    baseUrlPathname: urlContext.baseUrlPathname,
     hasApiKey: Boolean(apiKey),
     apiKeyLength: apiKey.length,
   });
 
   try {
-    response = await fetch(url, {
+    response = await fetch(urlContext.url, {
       method: "GET",
       headers: {
         "x-api-key": apiKey,
@@ -240,7 +266,13 @@ async function discEngineGetRequest<TResponse>(path: string): Promise<TResponse>
       cache: "no-store",
     });
   } catch (error) {
-    logServerEvent("error", "disc_engine_request_failed", { path, error });
+    logServerEvent("error", "disc_engine_request_failed", {
+      path: urlContext.path,
+      resolvedPathname: urlContext.resolvedPathname,
+      baseUrlHost: urlContext.baseUrlHost,
+      baseUrlPathname: urlContext.baseUrlPathname,
+      error,
+    });
     throw new DiscEngineError(`Failed to call disc-engine ${path}`);
   }
 
@@ -252,14 +284,18 @@ async function discEngineGetRequest<TResponse>(path: string): Promise<TResponse>
   }
 
   logServerEvent("info", "disc_engine_response_payload", {
-    path,
+    path: urlContext.path,
+    resolvedPathname: urlContext.resolvedPathname,
     status: response.status,
     body: sanitizeForLog(parsedBody),
   });
 
   if (!response.ok) {
     logServerEvent("error", "disc_engine_non_ok_response", {
-      path,
+      path: urlContext.path,
+      resolvedPathname: urlContext.resolvedPathname,
+      baseUrlHost: urlContext.baseUrlHost,
+      baseUrlPathname: urlContext.baseUrlPathname,
       status: response.status,
       hasBody: Boolean(parsedBody),
     });
@@ -500,31 +536,87 @@ type CreateDiscSessionInput = {
   inviteToken?: string | null;
 };
 
-export async function getDiscAssessmentVersions(): Promise<DiscAssessmentVersion[]> {
-  logServerEvent("info", "disc_version_discovery_started", { path: "/discovery" });
-  const result = await discEngineGetRequest<unknown>("/discovery");
-  const versions = extractAssessmentVersions(result);
+const DISCOVERY_ENDPOINT_CANDIDATES = ["/versions", "/discovery"] as const;
 
-  if (versions.length === 0) {
-    logServerEvent("error", "disc_version_discovery_empty", {
-      hasResult: Boolean(result),
-      resultKeys: result && typeof result === "object" ? Object.keys(result as Record<string, unknown>).slice(0, 20) : [],
-    });
-    throw new DiscEngineError("No DISC assessment versions were returned by disc-engine discovery.");
+let cachedDiscoveredVersions: DiscAssessmentVersion[] | null = null;
+let cachedDiscoveredVersionsAt = 0;
+let cachedDiscoveryError: { at: number; message: string } | null = null;
+
+const DISCOVERY_CACHE_TTL_MS = 60_000;
+const DISCOVERY_ERROR_COOLDOWN_MS = 15_000;
+
+export async function getDiscAssessmentVersions(): Promise<DiscAssessmentVersion[]> {
+  const now = Date.now();
+
+  if (cachedDiscoveredVersions && now - cachedDiscoveredVersionsAt < DISCOVERY_CACHE_TTL_MS) {
+    return cachedDiscoveredVersions;
   }
 
-  logServerEvent("info", "disc_version_discovery_succeeded", {
-    versionCount: versions.length,
-    versions: versions.map((version) => ({
-      id: version.id,
-      displayName: version.displayName,
-      expectedQuestionCount: version.expectedQuestionCount,
-      estimatedDurationMinutes: version.estimatedDurationMinutes,
-      isDefault: version.isDefault,
-    })),
+  if (cachedDiscoveryError && now - cachedDiscoveryError.at < DISCOVERY_ERROR_COOLDOWN_MS) {
+    throw new DiscEngineError(cachedDiscoveryError.message);
+  }
+
+  logServerEvent("info", "disc_version_discovery_started", {
+    endpointCandidates: DISCOVERY_ENDPOINT_CANDIDATES,
   });
 
-  return versions;
+  let lastError: DiscEngineError | null = null;
+
+  for (const path of DISCOVERY_ENDPOINT_CANDIDATES) {
+    try {
+      const result = await discEngineGetRequest<unknown>(path);
+      const versions = extractAssessmentVersions(result);
+
+      if (versions.length === 0) {
+        logServerEvent("error", "disc_version_discovery_empty", {
+          attemptedPath: path,
+          hasResult: Boolean(result),
+          resultKeys: result && typeof result === "object" ? Object.keys(result as Record<string, unknown>).slice(0, 20) : [],
+        });
+        throw new DiscEngineError(`disc-engine ${path} returned no assessment versions.`);
+      }
+
+      cachedDiscoveredVersions = versions;
+      cachedDiscoveredVersionsAt = Date.now();
+      cachedDiscoveryError = null;
+
+      logServerEvent("info", "disc_version_discovery_succeeded", {
+        path,
+        versionCount: versions.length,
+        versions: versions.map((version) => ({
+          id: version.id,
+          displayName: version.displayName,
+          expectedQuestionCount: version.expectedQuestionCount,
+          estimatedDurationMinutes: version.estimatedDurationMinutes,
+          isDefault: version.isDefault,
+        })),
+      });
+
+      return versions;
+    } catch (error) {
+      const normalizedError = error instanceof DiscEngineError ? error : new DiscEngineError("DISC version discovery request failed.");
+      lastError = normalizedError;
+      logServerEvent("warn", "disc_version_discovery_attempt_failed", {
+        attemptedPath: path,
+        status: normalizedError.status ?? null,
+        message: normalizedError.message,
+      });
+    }
+  }
+
+  const finalMessage = "Unable to load DISC assessment versions from disc-engine discovery endpoints.";
+  cachedDiscoveryError = {
+    at: Date.now(),
+    message: finalMessage,
+  };
+
+  logServerEvent("error", "disc_version_discovery_failed", {
+    attemptedPaths: DISCOVERY_ENDPOINT_CANDIDATES,
+    lastStatus: lastError?.status ?? null,
+    lastMessage: lastError?.message ?? null,
+  });
+
+  throw new DiscEngineError(finalMessage, lastError?.status, lastError?.details);
 }
 
 export async function createDiscSession(input: CreateDiscSessionInput): Promise<CreateDiscSessionResponse> {

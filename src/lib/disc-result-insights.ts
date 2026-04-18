@@ -41,6 +41,13 @@ export type DiscProfilePresentation = {
   dominantPair: [DiscDimension, DiscDimension];
 };
 
+export type DiscComparisonSummary = {
+  paceObservation: string;
+  styleObservation: string;
+  collaborationObservation: string;
+  practicalNote: string;
+};
+
 function toObject(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
@@ -292,6 +299,68 @@ export function buildDiscProfilePresentation(viewModel: DiscResultViewModel): Di
 
 export function buildDiscProfileSummary(viewModel: DiscResultViewModel) {
   return buildDiscProfilePresentation(viewModel).summary;
+}
+
+function highestDimensionLabel(viewModel: DiscResultViewModel) {
+  const ranked = rankDiscDimensions(viewModel.dimensionScores);
+  const topDimension = ranked[0]?.dimension ?? "D";
+  return DIMENSION_LABELS[topDimension];
+}
+
+function inferPaceProfile(viewModel: DiscResultViewModel) {
+  const highPace = (viewModel.dimensionScores.D ?? 0) + (viewModel.dimensionScores.I ?? 0);
+  const steadyPace = (viewModel.dimensionScores.S ?? 0) + (viewModel.dimensionScores.C ?? 0);
+
+  if (Math.abs(highPace - steadyPace) <= 0.08) {
+    return "balanced";
+  }
+
+  return highPace > steadyPace ? "fast" : "steady";
+}
+
+export function buildDiscComparisonSummary(profiles: Array<{ name: string; viewModel: DiscResultViewModel }>): DiscComparisonSummary {
+  const first = profiles[0];
+  const second = profiles[1];
+
+  if (!first || !second) {
+    return {
+      paceObservation: "Add at least two completed profiles to generate a comparison summary.",
+      styleObservation: "Comparison style cues are shown when two completed DISC profiles are selected.",
+      collaborationObservation: "Use the profile cards below to review each person’s DISC weighting and figure placement.",
+      practicalNote: "Treat this as a practical collaboration guide, not a fixed label.",
+    };
+  }
+
+  const firstPace = inferPaceProfile(first.viewModel);
+  const secondPace = inferPaceProfile(second.viewModel);
+  const firstTop = highestDimensionLabel(first.viewModel);
+  const secondTop = highestDimensionLabel(second.viewModel);
+
+  const paceObservation =
+    firstPace === secondPace
+      ? firstPace === "fast"
+        ? `${first.name} and ${second.name} both show a relatively quick pace and may prefer faster decisions.`
+        : firstPace === "steady"
+          ? `${first.name} and ${second.name} both show a steadier pace and may prefer clear process before action.`
+          : `${first.name} and ${second.name} both show a balanced pace between action and stability.`
+      : `${first.name} appears faster-paced while ${second.name} appears more steady-paced, which can be complementary when balancing momentum and follow-through.`;
+
+  const styleObservation =
+    firstTop === secondTop
+      ? `Both profiles are led by ${firstTop}, suggesting overlap in default communication and decision style.`
+      : `${first.name} is led by ${firstTop} tendencies while ${second.name} is led by ${secondTop} tendencies.`;
+
+  const collaborationObservation =
+    firstTop === secondTop && firstPace === secondPace
+      ? "Because their style patterns are similar, align clearly on role ownership to avoid overlap."
+      : "Because their style patterns differ, clarify decision rights and handoff expectations early.";
+
+  return {
+    paceObservation,
+    styleObservation,
+    collaborationObservation,
+    practicalNote: "Use these observations as practical teamwork prompts grounded in profile data.",
+  };
 }
 
 function clamp(value: number, min: number, max: number) {
