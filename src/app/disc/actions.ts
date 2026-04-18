@@ -16,6 +16,7 @@ import {
   validateDiscResponses,
 } from "@/lib/disc-engine";
 import { extractCanonicalResult } from "@/lib/disc-result-insights";
+import { assertSelectableVersion, getPersonalDiscVersionEntitlements } from "@/lib/disc-version-entitlements";
 import { logServerEvent } from "@/lib/logger";
 import { enforceRateLimit } from "@/lib/rate-limit";
 
@@ -30,12 +31,64 @@ function toErrorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
-export async function startDiscAssessment(_: DiscFlowState): Promise<DiscFlowState> {
+export async function startDiscAssessment(_: DiscFlowState, formData: FormData): Promise<DiscFlowState> {
   const session = await auth();
   const userId = session?.user?.id ?? "anonymous";
   const cookieStore = await cookies();
+  const selectedAssessmentVersionId = String(formData.get("assessmentVersionId") ?? "").trim();
   const existingSessionId = cookieStore.get(DISC_SESSION_COOKIE)?.value;
   const submittedSessionId = cookieStore.get(DISC_SUBMITTED_COOKIE)?.value;
+
+  if (!selectedAssessmentVersionId) {
+    return {
+      status: "error",
+      message: "Vælg en DISC-version før testen startes.",
+      sessionId: "",
+      questions: [],
+    };
+  }
+
+  logServerEvent("info", "disc_flow_version_selected", {
+    userId,
+    assessmentVersionId: selectedAssessmentVersionId,
+  });
+
+  let entitlement;
+  try {
+    const resolution = await getPersonalDiscVersionEntitlements({
+      user: {
+        id: session?.user?.id ?? "anonymous",
+        role: session?.user?.role ?? "USER",
+      },
+    });
+    entitlement = assertSelectableVersion(resolution, selectedAssessmentVersionId);
+  } catch (error) {
+    logServerEvent("error", "disc_flow_version_entitlements_failed", {
+      userId,
+      assessmentVersionId: selectedAssessmentVersionId,
+      error,
+    });
+    return {
+      status: "error",
+      message: toErrorMessage(error, "Unable to validate DISC version access right now."),
+      sessionId: "",
+      questions: [],
+    };
+  }
+
+  if (!entitlement) {
+    logServerEvent("warn", "disc_flow_session_create_denied", {
+      userId,
+      assessmentVersionId: selectedAssessmentVersionId,
+      reason: "not_entitled",
+    });
+    return {
+      status: "error",
+      message: "Du har ikke adgang til den valgte DISC-version.",
+      sessionId: "",
+      questions: [],
+    };
+  }
 
   if (existingSessionId && existingSessionId !== submittedSessionId) {
     try {
@@ -68,12 +121,19 @@ export async function startDiscAssessment(_: DiscFlowState): Promise<DiscFlowSta
   }
 
   try {
+    logServerEvent("info", "disc_flow_session_create_attempt", {
+      userId,
+      assessmentVersionId: selectedAssessmentVersionId,
+    });
+
     const createdSession = await createDiscSession({
+      assessmentVersionId: selectedAssessmentVersionId,
       initiatedByUserId: session?.user?.id ?? null,
     });
     const questions = await getDiscSessionQuestions(createdSession.sessionId);
     await createDiscAssessmentRecord({
       externalSessionId: createdSession.sessionId,
+      assessmentVersionId: selectedAssessmentVersionId,
       userId: session?.user?.id ?? null,
     });
 
@@ -86,7 +146,11 @@ export async function startDiscAssessment(_: DiscFlowState): Promise<DiscFlowSta
     });
     cookieStore.delete(DISC_SUBMITTED_COOKIE);
 
-    logServerEvent("info", "disc_flow_session_created", { userId, sessionId: createdSession.sessionId });
+    logServerEvent("info", "disc_flow_session_created", {
+      userId,
+      sessionId: createdSession.sessionId,
+      assessmentVersionId: selectedAssessmentVersionId,
+    });
 
     return {
       status: "success",
@@ -95,7 +159,11 @@ export async function startDiscAssessment(_: DiscFlowState): Promise<DiscFlowSta
       questions,
     };
   } catch (error) {
-    logServerEvent("error", "disc_flow_session_create_failed", { userId, error });
+    logServerEvent("error", "disc_flow_session_create_failed", {
+      userId,
+      assessmentVersionId: selectedAssessmentVersionId,
+      error,
+    });
 
     return {
       status: "error",
