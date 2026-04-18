@@ -286,8 +286,8 @@ export function InviteDiscClient({
         {hasStartedSession && !hasQuestions && startState.status !== "error" ? (
           <p className="text-sm text-muted-foreground">Loading assessment questions...</p>
         ) : null}
-        {!hasStartedSession && selectableEntitlements.length === 0 && versionEntitlements.length > 0 ? (
-          <p className="text-sm text-muted-foreground">Denne invitation har ingen DISC-versioner du kan starte endnu.</p>
+        {!hasStartedSession && selectableEntitlements.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Ingen DISC-assessments er tilgængelige for denne invitation lige nu.</p>
         ) : null}
       </div>
 

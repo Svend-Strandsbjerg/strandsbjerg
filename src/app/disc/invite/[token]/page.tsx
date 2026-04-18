@@ -92,7 +92,7 @@ export default async function InviteDiscPage({ params }: InviteDiscPageProps) {
 
   try {
     const resolution = await getInviteDiscVersionEntitlements({
-      user: { id: session.user.id, role: session.user.role },
+      user: { id: session.user.id, role: session.user.role ?? "USER" },
       inviteToken: token,
       companyId: invite.companyId,
     });

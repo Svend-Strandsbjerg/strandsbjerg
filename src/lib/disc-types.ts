@@ -31,10 +31,12 @@ export type DiscVersionEntitlementStatus = "selectable" | "locked" | "hidden";
 
 export type DiscVersionEntitlementReason =
   | "free_access"
-  | "invite_access"
+  | "personal_upgrade"
+  | "company_policy"
+  | "company_invite_policy"
+  | "context_restricted"
   | "upgrade_required"
-  | "company_restricted"
-  | "admin_only"
+  | "not_configured"
   | "unknown";
 
 export type DiscVersionEntitlement = {
@@ -43,3 +45,5 @@ export type DiscVersionEntitlement = {
   status: DiscVersionEntitlementStatus;
   reason: DiscVersionEntitlementReason;
 };
+
+export type DiscTierAccessLevel = "free" | "standard" | "deep";

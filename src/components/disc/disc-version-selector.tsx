@@ -14,6 +14,22 @@ function buildVersionDescription(version: DiscVersionEntitlement["version"]) {
   return version.description ?? version.intendedUse ?? "Assessment details are provided by the DISC engine.";
 }
 
+function lockReasonCopy(reason: DiscVersionEntitlement["reason"]) {
+  if (reason === "upgrade_required") {
+    return "Ikke inkluderet i dit nuværende personlige adgangsniveau.";
+  }
+
+  if (reason === "context_restricted") {
+    return "Ikke inkluderet i denne invitation eller virksomhedsadgang.";
+  }
+
+  if (reason === "not_configured") {
+    return "Versionen er fundet, men er ikke klargjort til adgang endnu.";
+  }
+
+  return "Denne DISC-version er ikke tilgængelig endnu.";
+}
+
 export function DiscVersionSelector({ entitlements, selectedVersionId, onSelect, disabled = false }: DiscVersionSelectorProps) {
   return (
     <div className="space-y-3">
@@ -47,6 +63,7 @@ export function DiscVersionSelector({ entitlements, selectedVersionId, onSelect,
               {selected ? <span className="text-xs font-semibold uppercase tracking-[0.12em] text-foreground">Valgt</span> : null}
               {isLocked ? <span className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Låst</span> : null}
             </div>
+            {isLocked ? <p className="mt-2 text-xs text-muted-foreground">{lockReasonCopy(entitlement.reason)}</p> : null}
             <div className="mt-3 flex flex-wrap gap-2">
               {version.expectedQuestionCount !== null ? (
                 <span className="rounded-full border border-border/80 bg-muted/40 px-2.5 py-1 text-[11px] text-muted-foreground">

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
-import { AssessmentInviteStatus, CompanyRole } from "@prisma/client";
+import { AssessmentInviteStatus, CompanyRole, DiscTierAccess } from "@prisma/client";
 
 import { requireUser } from "@/lib/access";
 import { canCreateCompanyProfile, canManageCompany } from "@/lib/company-access";
@@ -33,6 +33,14 @@ async function inferOrigin() {
 
 function isChecked(formValue: FormDataEntryValue | null) {
   return formValue === "on" || formValue === "true";
+}
+
+function parseDiscTierAccess(value: string): DiscTierAccess | null {
+  if (value === DiscTierAccess.FREE || value === DiscTierAccess.STANDARD || value === DiscTierAccess.DEEP) {
+    return value;
+  }
+
+  return null;
 }
 
 export async function createAssessmentInvite(
@@ -384,5 +392,46 @@ export async function createCompanyProfile(
       error,
     });
     return { status: "error", message: "Could not create company profile." };
+  }
+}
+
+export async function updateCompanyDiscTierAccess(
+  _: CompanyInviteActionState,
+  formData: FormData,
+): Promise<CompanyInviteActionState> {
+  const user = await requireUser();
+  const companyId = String(formData.get("companyId") ?? "").trim();
+  const requestedTier = parseDiscTierAccess(String(formData.get("discMaxTierAccess") ?? "").trim().toUpperCase());
+
+  if (!companyId || !requestedTier) {
+    return { status: "error", message: "Invalid DISC tier update request." };
+  }
+
+  try {
+    await requireCompanyAdmin(user.id, companyId);
+
+    await prisma.company.update({
+      where: { id: companyId },
+      data: { discMaxTierAccess: requestedTier },
+      select: { id: true },
+    });
+
+    logServerEvent("info", "disc_company_tier_access_updated", {
+      companyId,
+      updatedByUserId: user.id,
+      discMaxTierAccess: requestedTier,
+    });
+
+    revalidatePath("/disc/company");
+    revalidatePath("/disc/overview");
+
+    return { status: "success", message: "DISC tier access updated." };
+  } catch (error) {
+    logServerEvent("error", "disc_company_tier_access_update_failed", {
+      companyId,
+      userId: user.id,
+      error,
+    });
+    return { status: "error", message: "Could not update DISC tier access." };
   }
 }

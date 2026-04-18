@@ -60,6 +60,12 @@ enum CompanyPlanTier {
   ENTERPRISE
 }
 
+enum DiscTierAccess {
+  FREE
+  STANDARD
+  DEEP
+}
+
 enum AssessmentInviteStatus {
   ACTIVE
   COMPLETED
@@ -81,6 +87,7 @@ model User {
   passwordHash   String?
   role           Role           @default(USER)
   approvalStatus ApprovalStatus @default(PENDING)
+  discMaxTierOverride DiscTierAccess?
 
   accounts               Account[]
   sessions               Session[]
@@ -106,6 +113,7 @@ model Company {
   licenseStatus CompanyLicenseStatus @default(ACTIVE)
   planTier  CompanyPlanTier      @default(FREE)
   seatLimit Int?
+  discMaxTierAccess DiscTierAccess @default(FREE)
   selfServiceCreationEnabled Boolean @default(false)
   activatedAt DateTime?
   deactivatedAt DateTime?

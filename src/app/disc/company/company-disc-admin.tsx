@@ -8,6 +8,7 @@ import {
   invalidateAssessmentInvite,
   resendAssessmentInviteEmail,
   resendAssessmentResultEmail,
+  updateCompanyDiscTierAccess,
 } from "@/app/disc/company/actions";
 import { initialCompanyInviteActionState } from "@/app/disc/company/action-state";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ type CompanyDiscAdminProps = {
     status: "ACTIVE" | "INACTIVE";
     licenseStatus: "ACTIVE" | "TRIAL" | "INACTIVE" | "EXPIRED";
     planTier: "FREE" | "STANDARD" | "ENTERPRISE";
+    discMaxTierAccess: "FREE" | "STANDARD" | "DEEP";
     seatLimit: number | null;
     invites: Array<{
       id: string;
@@ -127,6 +129,7 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
   const [invalidateState, invalidateAction] = useActionState(invalidateAssessmentInvite, initialCompanyInviteActionState);
   const [resendInviteState, resendInviteAction] = useActionState(resendAssessmentInviteEmail, initialCompanyInviteActionState);
   const [resendState, resendAction] = useActionState(resendAssessmentResultEmail, initialCompanyInviteActionState);
+  const [tierAccessState, tierAccessAction] = useActionState(updateCompanyDiscTierAccess, initialCompanyInviteActionState);
   const [lastCreatedCompanyId, setLastCreatedCompanyId] = useState<string | null>(null);
 
   const infoState = useMemo(() => {
@@ -138,12 +141,16 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
       return resendInviteState;
     }
 
+    if (tierAccessState.status !== "idle") {
+      return tierAccessState;
+    }
+
     if (invalidateState.status !== "idle") {
       return invalidateState;
     }
 
     return createState;
-  }, [createState, invalidateState, resendInviteState, resendState]);
+  }, [createState, invalidateState, resendInviteState, resendState, tierAccessState]);
 
   return (
     <div className="space-y-6">
@@ -210,6 +217,30 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
                 <h2 className="text-xl font-semibold tracking-tight">{company.name}</h2>
                 <p className="mt-1 text-sm text-muted-foreground">Rolle: {company.membershipRole === "COMPANY_ADMIN" ? "Company admin" : "Company viewer"} · Plan: {company.planTier} · Licens: {company.licenseStatus}</p>
               </div>
+            </div>
+
+            <div className="mt-4 rounded-xl border border-border/80 bg-muted/20 p-4">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">DISC tier access</h3>
+              <p className="mt-2 text-sm text-muted-foreground">Styr hvilket højeste DISC-niveau invitationer og medarbejdere i virksomheden arver som udgangspunkt.</p>
+              {canManageCompany(company.membershipRole) ? (
+                <form action={tierAccessAction} className="mt-3 flex flex-wrap items-center gap-3">
+                  <input type="hidden" name="companyId" value={company.id} />
+                  <select
+                    name="discMaxTierAccess"
+                    defaultValue={company.discMaxTierAccess}
+                    className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                  >
+                    <option value="FREE">Free</option>
+                    <option value="STANDARD">Standard</option>
+                    <option value="DEEP">Deep</option>
+                  </select>
+                  <Button type="submit" variant="outline" className="h-9">
+                    Gem tier-adgang
+                  </Button>
+                </form>
+              ) : (
+                <p className="mt-2 text-xs text-muted-foreground">Nuværende adgang: {company.discMaxTierAccess}. Kun Company Admin kan ændre denne indstilling.</p>
+              )}
             </div>
 
             {canManageCompany(company.membershipRole) ? (

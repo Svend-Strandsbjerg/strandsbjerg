@@ -4,9 +4,9 @@ import { CompanyLicenseStatus, CompanyRole, CompanyStatus, type Company } from "
 
 import { prisma } from "@/lib/prisma";
 
-const COMPANY_ACCESS_ROLES = [CompanyRole.COMPANY_ADMIN, CompanyRole.COMPANY_VIEWER] as const;
-const ACTIVE_COMPANY_STATUSES = [CompanyStatus.ACTIVE] as const;
-const ACTIVE_COMPANY_LICENSE_STATUSES = [CompanyLicenseStatus.ACTIVE, CompanyLicenseStatus.TRIAL] as const;
+const COMPANY_ACCESS_ROLES: CompanyRole[] = [CompanyRole.COMPANY_ADMIN, CompanyRole.COMPANY_VIEWER];
+const ACTIVE_COMPANY_STATUSES: CompanyStatus[] = [CompanyStatus.ACTIVE];
+const ACTIVE_COMPANY_LICENSE_STATUSES: CompanyLicenseStatus[] = [CompanyLicenseStatus.ACTIVE, CompanyLicenseStatus.TRIAL];
 
 export function canSelfServiceCreateCompany() {
   return process.env.DISC_COMPANY_SELF_SERVICE_CREATION === "true";
@@ -124,6 +124,7 @@ export async function getCompanyAreaMemberships(userId: string) {
           status: true,
           licenseStatus: true,
           planTier: true,
+          discMaxTierAccess: true,
           seatLimit: true,
           selfServiceCreationEnabled: true,
           invites: {

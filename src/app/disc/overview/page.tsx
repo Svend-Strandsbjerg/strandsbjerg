@@ -17,7 +17,7 @@ export default async function DiscOverviewPage() {
 
   try {
     const resolution = await getPersonalDiscVersionEntitlements({
-      user: { id: user.id, role: user.role },
+      user: { id: user.id, role: user.role ?? "USER" },
     });
     versionEntitlements = resolution.visibleEntitlements;
     autoSelectedAssessmentVersionId = resolution.autoSelectedAssessmentVersionId;

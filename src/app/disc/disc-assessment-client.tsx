@@ -286,8 +286,8 @@ export function DiscAssessmentClient({
             {hasStartedSession && !hasQuestions && startState.status !== "error" ? (
               <p className="text-sm text-muted-foreground">Loading assessment questions...</p>
             ) : null}
-            {!hasStartedSession && selectableEntitlements.length === 0 && versionEntitlements.length > 0 ? (
-              <p className="text-sm text-muted-foreground">Der er ingen DISC-versioner du kan starte endnu.</p>
+            {!hasStartedSession && selectableEntitlements.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Der er ingen DISC-assessments tilgængelige for denne konto lige nu.</p>
             ) : null}
 
             {userId ? (
