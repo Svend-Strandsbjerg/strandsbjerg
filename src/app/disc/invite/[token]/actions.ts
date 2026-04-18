@@ -18,6 +18,7 @@ import {
 } from "@/lib/disc-engine";
 import { getInviteAccessState } from "@/lib/disc-invites";
 import { extractCanonicalResult } from "@/lib/disc-result-insights";
+import { assertSelectableVersion, getInviteDiscVersionEntitlements } from "@/lib/disc-version-entitlements";
 import { logServerEvent } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import { enforceRateLimit } from "@/lib/rate-limit";
@@ -73,6 +74,7 @@ export async function startInviteDiscAssessment(_: InviteDiscState, formData: Fo
   const session = await auth();
   const userId = session?.user?.id;
   const token = String(formData.get("token") ?? "").trim();
+  const selectedAssessmentVersionId = String(formData.get("assessmentVersionId") ?? "").trim();
 
   if (!userId) {
     return { status: "error", message: "Log ind for at fortsætte invitationen.", sessionId: "", questions: [] };
@@ -81,6 +83,16 @@ export async function startInviteDiscAssessment(_: InviteDiscState, formData: Fo
   if (!token) {
     return { status: "error", message: "Invalid invite token.", sessionId: "", questions: [] };
   }
+
+  if (!selectedAssessmentVersionId) {
+    return { status: "error", message: "Vælg en DISC-version før testen startes.", sessionId: "", questions: [] };
+  }
+
+  logServerEvent("info", "disc_invite_version_selected", {
+    inviteToken: token,
+    userId,
+    assessmentVersionId: selectedAssessmentVersionId,
+  });
 
   const rateLimit = enforceRateLimit({
     key: `invite-start:${token}`,
@@ -93,6 +105,44 @@ export async function startInviteDiscAssessment(_: InviteDiscState, formData: Fo
 
   try {
     const invite = await getActiveInviteOrThrow(token);
+    let entitlement = null;
+    try {
+      const resolution = await getInviteDiscVersionEntitlements({
+        user: { id: userId, role: session.user.role },
+        inviteToken: token,
+        companyId: invite.companyId,
+      });
+      entitlement = assertSelectableVersion(resolution, selectedAssessmentVersionId);
+    } catch (error) {
+      logServerEvent("error", "disc_invite_version_entitlements_failed", {
+        inviteToken: token,
+        userId,
+        assessmentVersionId: selectedAssessmentVersionId,
+        error,
+      });
+      return {
+        status: "error",
+        message: toErrorMessage(error, "Unable to validate DISC version access right now."),
+        sessionId: "",
+        questions: [],
+      };
+    }
+
+    if (!entitlement) {
+      logServerEvent("warn", "disc_invite_session_create_denied", {
+        inviteToken: token,
+        userId,
+        assessmentVersionId: selectedAssessmentVersionId,
+        reason: "not_entitled",
+      });
+      return {
+        status: "error",
+        message: "Du har ikke adgang til den valgte DISC-version.",
+        sessionId: "",
+        questions: [],
+      };
+    }
+
     const existingAssessment = await prisma.discAssessment.findFirst({
       where: {
         inviteId: invite.id,
@@ -128,7 +178,14 @@ export async function startInviteDiscAssessment(_: InviteDiscState, formData: Fo
       };
     }
 
+    logServerEvent("info", "disc_invite_session_create_attempt", {
+      inviteToken: token,
+      userId,
+      assessmentVersionId: selectedAssessmentVersionId,
+    });
+
     const createdSession = await createDiscSession({
+      assessmentVersionId: selectedAssessmentVersionId,
       initiatedByUserId: userId,
       companyId: invite.companyId,
       inviteToken: token,
@@ -136,6 +193,7 @@ export async function startInviteDiscAssessment(_: InviteDiscState, formData: Fo
     const questions = await getDiscSessionQuestions(createdSession.sessionId);
     await createDiscAssessmentRecord({
       externalSessionId: createdSession.sessionId,
+      assessmentVersionId: selectedAssessmentVersionId,
       userId,
       inviteId: invite.id,
       companyId: invite.companyId,
@@ -152,6 +210,7 @@ export async function startInviteDiscAssessment(_: InviteDiscState, formData: Fo
   } catch (error) {
     logServerEvent("error", "disc_invite_start_failed", {
       inviteToken: token,
+      assessmentVersionId: selectedAssessmentVersionId,
       error,
     });
 

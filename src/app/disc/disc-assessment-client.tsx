@@ -10,6 +10,7 @@ import {
   submitDiscAssessmentResponses,
 } from "@/app/disc/actions";
 import { DiscResultPresentation } from "@/components/disc/disc-result-presentation";
+import { DiscVersionSelector } from "@/components/disc/disc-version-selector";
 import { Button } from "@/components/ui/button";
 import {
   ContentContainer,
@@ -18,9 +19,13 @@ import {
   SectionBlock,
 } from "@/components/ui/page-layout";
 import { cn } from "@/lib/utils";
+import type { DiscVersionEntitlement } from "@/lib/disc-types";
 
 type DiscAssessmentClientProps = {
   userId: string | null;
+  versionEntitlements: DiscVersionEntitlement[];
+  autoSelectedAssessmentVersionId: string | null;
+  versionDiscoveryError: string | null;
   hasCompanyDiscAccess: boolean;
   totalAssessmentCount: number;
   assessments: Array<{
@@ -60,7 +65,15 @@ const LIKERT_NODE_TONES = [
 const QUESTION_ADVANCE_DELAY_MS = 180;
 const COMPLETION_TRANSITION_DELAY_MS = 250;
 
-export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, totalAssessmentCount, assessments }: DiscAssessmentClientProps) {
+export function DiscAssessmentClient({
+  userId,
+  versionEntitlements,
+  autoSelectedAssessmentVersionId,
+  versionDiscoveryError,
+  hasCompanyDiscAccess,
+  totalAssessmentCount,
+  assessments,
+}: DiscAssessmentClientProps) {
   const router = useRouter();
   const [startState, startAction, starting] = useActionState(startDiscAssessment, initialDiscFlowState);
   const [submitState, submitAction, submitting] = useActionState(submitDiscAssessmentResponses, initialDiscFlowState);
@@ -72,12 +85,18 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, totalAssess
   const [isTransitioningQuestion, setIsTransitioningQuestion] = useState(false);
   const [isCompletingAssessment, setIsCompletingAssessment] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState("");
+  const [selectedAssessmentVersionId, setSelectedAssessmentVersionId] = useState(autoSelectedAssessmentVersionId ?? "");
   const submitFormRef = useRef<HTMLFormElement>(null);
 
   const currentSessionId = useMemo(() => submitState.sessionId || startState.sessionId, [startState.sessionId, submitState.sessionId]);
   const questions = startState.questions;
   const hasStartedSession = Boolean(activeSessionId);
   const hasQuestions = questions.length > 0;
+  const selectableEntitlements = useMemo(() => versionEntitlements.filter((entitlement) => entitlement.status === "selectable"), [versionEntitlements]);
+  const selectedVersion = useMemo(
+    () => versionEntitlements.find((entitlement) => entitlement.version.id === selectedAssessmentVersionId)?.version ?? null,
+    [versionEntitlements, selectedAssessmentVersionId],
+  );
   const activeQuestion = hasQuestions ? questions[Math.min(activeQuestionIndex, questions.length - 1)] : null;
   const [isMobileTimelineOpen, setIsMobileTimelineOpen] = useState(false);
 
@@ -191,6 +210,13 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, totalAssess
   const answeredCount = questions.filter((question) => Boolean(selectedOptionIdByQuestionId[question.id])).length;
   const isReadyForSubmit = hasQuestions && answeredCount === questions.length;
   const isFinalOverviewVisible = hasEnteredFinalOverview && isReadyForSubmit;
+  const canStartAssessment = selectedAssessmentVersionId.length > 0 && !versionDiscoveryError;
+
+  useEffect(() => {
+    if (!selectedAssessmentVersionId && selectableEntitlements.length === 1) {
+      setSelectedAssessmentVersionId(selectableEntitlements[0].version.id);
+    }
+  }, [selectableEntitlements, selectedAssessmentVersionId]);
 
   useEffect(() => {
     if (isReadyForSubmit) {
@@ -225,7 +251,7 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, totalAssess
           intro="Use DISC to assess communication and behavior preferences, then continue into personal or company-driven assessment workflows."
         >
           <div className="mt-4 flex flex-wrap gap-3">
-            <Button type="button" onClick={() => setIsStartModalOpen(true)} disabled={starting || hasStartedSession}>
+            <Button type="button" onClick={() => setIsStartModalOpen(true)} disabled={starting || hasStartedSession || selectableEntitlements.length === 0}>
               {starting ? "Starting session..." : hasStartedSession ? "Session active" : "Take DISC assessment"}
             </Button>
             {hasCompanyDiscAccess ? (
@@ -243,7 +269,7 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, totalAssess
           <ContentContainer>
             {!hasStartedSession ? (
               <div className="flex flex-wrap gap-3">
-                <Button type="button" onClick={() => setIsStartModalOpen(true)} disabled={starting}>
+                <Button type="button" onClick={() => setIsStartModalOpen(true)} disabled={starting || selectableEntitlements.length === 0}>
                   {starting ? "Starting session..." : "Take DISC assessment"}
                 </Button>
               </div>
@@ -259,6 +285,9 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, totalAssess
 
             {hasStartedSession && !hasQuestions && startState.status !== "error" ? (
               <p className="text-sm text-muted-foreground">Loading assessment questions...</p>
+            ) : null}
+            {!hasStartedSession && selectableEntitlements.length === 0 && versionEntitlements.length > 0 ? (
+              <p className="text-sm text-muted-foreground">Der er ingen DISC-versioner du kan starte endnu.</p>
             ) : null}
 
             {userId ? (
@@ -349,7 +378,25 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, totalAssess
             <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">DISC assessment</p>
             <h2 className="mt-2 text-xl font-semibold">Svar intuitivt og ærligt</h2>
             <p className="mt-2 text-sm text-muted-foreground">Du får ét spørgsmål ad gangen. Vælg det svar der føles mest rigtigt med det samme.</p>
-            <p className="mt-2 text-sm font-medium text-foreground">Tager ca. 2–3 minutter.</p>
+            <div className="mt-4">
+              {versionEntitlements.length > 0 ? (
+                <DiscVersionSelector
+                  entitlements={versionEntitlements}
+                  selectedVersionId={selectedAssessmentVersionId}
+                  onSelect={setSelectedAssessmentVersionId}
+                  disabled={starting}
+                />
+              ) : null}
+              {versionDiscoveryError ? (
+                <div className="mt-3 rounded-lg border border-destructive/40 bg-destructive/5 p-3" role="alert" aria-live="polite">
+                  <p className="text-sm font-medium text-destructive">DISC-versioner kunne ikke hentes</p>
+                  <p className="mt-1 text-sm text-destructive/90">{versionDiscoveryError}</p>
+                </div>
+              ) : null}
+            </div>
+            {selectedVersion?.estimatedDurationMinutes ? (
+              <p className="mt-2 text-sm font-medium text-foreground">Tager ca. {selectedVersion.estimatedDurationMinutes} minutter.</p>
+            ) : null}
             {startState.status === "error" ? (
               <div className="mt-4 rounded-lg border border-destructive/40 bg-destructive/5 p-3" role="alert" aria-live="polite">
                 <p className="text-sm font-medium text-destructive">Kunne ikke starte testen</p>
@@ -361,7 +408,8 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, totalAssess
                 Luk
               </Button>
               <form action={startAction}>
-                <Button type="submit" disabled={starting}>{starting ? "Starting..." : "Start test"}</Button>
+                <input type="hidden" name="assessmentVersionId" value={selectedAssessmentVersionId} />
+                <Button type="submit" disabled={starting || !canStartAssessment}>{starting ? "Starting..." : "Start test"}</Button>
               </form>
             </div>
           </div>
@@ -459,8 +507,8 @@ export function DiscAssessmentClient({ userId, hasCompanyDiscAccess, totalAssess
                                   <span>{LIKERT_EDGE_LABELS.low}</span>
                                   <span>{LIKERT_EDGE_LABELS.high}</span>
                                 </div>
-                                <div className="grid grid-cols-5 gap-2 sm:gap-3">
-                                  {activeQuestion.options.slice(0, 5).map((option, index) => {
+                                <div className="grid gap-2 sm:gap-3" style={{ gridTemplateColumns: `repeat(${Math.max(activeQuestion.options.length, 1)}, minmax(0, 1fr))` }}>
+                                  {activeQuestion.options.map((option, index) => {
                                     const selected = (selectedOptionIdByQuestionId[activeQuestion.id] ?? "") === option.id;
                                     return (
                                       <button

@@ -14,3 +14,32 @@ export type DiscQuestion = {
   prompt: string;
   options: DiscQuestionOption[];
 };
+
+export type DiscAssessmentVersion = {
+  id: string;
+  displayName: string;
+  description: string | null;
+  intendedUse: string | null;
+  expectedQuestionCount: number | null;
+  estimatedDurationMinutes: number | null;
+  isDefault: boolean;
+};
+
+export type DiscVersionCategory = "free" | "standard" | "deep" | "unknown";
+
+export type DiscVersionEntitlementStatus = "selectable" | "locked" | "hidden";
+
+export type DiscVersionEntitlementReason =
+  | "free_access"
+  | "invite_access"
+  | "upgrade_required"
+  | "company_restricted"
+  | "admin_only"
+  | "unknown";
+
+export type DiscVersionEntitlement = {
+  version: DiscAssessmentVersion;
+  category: DiscVersionCategory;
+  status: DiscVersionEntitlementStatus;
+  reason: DiscVersionEntitlementReason;
+};

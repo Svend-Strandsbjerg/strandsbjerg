@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { DiscQuestion, DiscQuestionOption, DiscResponseInput } from "@/lib/disc-types";
+import type { DiscAssessmentVersion, DiscQuestion, DiscQuestionOption, DiscResponseInput } from "@/lib/disc-types";
 import { logServerEvent } from "@/lib/logger";
 
 export type DiscEngineSessionMetadata = {
@@ -85,7 +85,7 @@ function sanitizeForLog(value: unknown, depth = 0): unknown {
   return String(value);
 }
 
-function getRequiredEnv(name: "DISC_ENGINE_BASE_URL" | "DISC_ENGINE_API_KEY" | "DISC_ENGINE_ASSESSMENT_VERSION_ID") {
+function getRequiredEnv(name: "DISC_ENGINE_BASE_URL" | "DISC_ENGINE_API_KEY") {
   const value = process.env[name];
 
   if (!value) {
@@ -274,6 +274,109 @@ function readStringKey(record: Record<string, unknown>, key: string): string | n
   return typeof value === "string" && value.trim().length > 0 ? value : null;
 }
 
+function readNumberKey(record: Record<string, unknown>, key: string): number | null {
+  const value = record[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function parseAssessmentVersion(value: unknown): DiscAssessmentVersion | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const id =
+    readStringKey(record, "id") ??
+    readStringKey(record, "assessmentVersionId") ??
+    readStringKey(record, "assessment_version_id") ??
+    readStringKey(record, "versionId");
+
+  if (!id) {
+    return null;
+  }
+
+  const displayName =
+    readStringKey(record, "displayName") ??
+    readStringKey(record, "display_name") ??
+    readStringKey(record, "name") ??
+    readStringKey(record, "label") ??
+    id;
+
+  const description =
+    readStringKey(record, "description") ??
+    readStringKey(record, "summary") ??
+    readStringKey(record, "shortDescription") ??
+    readStringKey(record, "short_description");
+
+  const intendedUse =
+    readStringKey(record, "intendedUse") ??
+    readStringKey(record, "intended_use") ??
+    readStringKey(record, "useCase") ??
+    readStringKey(record, "use_case");
+
+  const expectedQuestionCount =
+    readNumberKey(record, "expectedQuestionCount") ??
+    readNumberKey(record, "questionCount") ??
+    readNumberKey(record, "question_count") ??
+    readNumberKey(record, "totalQuestions");
+
+  const estimatedDurationMinutes =
+    readNumberKey(record, "estimatedDurationMinutes") ??
+    readNumberKey(record, "estimated_minutes") ??
+    readNumberKey(record, "durationMinutes") ??
+    readNumberKey(record, "estimatedCompletionMinutes");
+
+  return {
+    id,
+    displayName,
+    description,
+    intendedUse,
+    expectedQuestionCount,
+    estimatedDurationMinutes,
+    isDefault: record.isDefault === true || record.default === true,
+  };
+}
+
+function extractAssessmentVersions(payload: unknown): DiscAssessmentVersion[] {
+  if (!payload || typeof payload !== "object") {
+    return [];
+  }
+
+  const root = payload as Record<string, unknown>;
+  const candidates: unknown[] = [
+    root.assessmentVersions,
+    root.assessment_versions,
+    root.versions,
+    root.data,
+    root.discovery,
+    root.disc,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      const versions = candidate.map(parseAssessmentVersion).filter((version): version is DiscAssessmentVersion => Boolean(version));
+      if (versions.length > 0) {
+        return versions;
+      }
+    }
+
+    if (!candidate || typeof candidate !== "object") {
+      continue;
+    }
+
+    const candidateRecord = candidate as Record<string, unknown>;
+    const nested = candidateRecord.assessmentVersions ?? candidateRecord.assessment_versions ?? candidateRecord.versions;
+    if (Array.isArray(nested)) {
+      const versions = nested.map(parseAssessmentVersion).filter((version): version is DiscAssessmentVersion => Boolean(version));
+      if (versions.length > 0) {
+        return versions;
+      }
+    }
+  }
+
+  return [];
+}
+
 function extractSessionIdFromCreateSessionResponse(payload: unknown): string | null {
   if (!payload || typeof payload !== "object") {
     return null;
@@ -391,17 +494,43 @@ function extractQuestionsFromPayload(payload: unknown): DiscQuestion[] {
 }
 
 type CreateDiscSessionInput = {
+  assessmentVersionId: string;
   initiatedByUserId?: string | null;
   companyId?: string | null;
   inviteToken?: string | null;
 };
 
-export async function createDiscSession(input: CreateDiscSessionInput = {}): Promise<CreateDiscSessionResponse> {
-  const assessmentVersionId = getRequiredEnv("DISC_ENGINE_ASSESSMENT_VERSION_ID");
+export async function getDiscAssessmentVersions(): Promise<DiscAssessmentVersion[]> {
+  logServerEvent("info", "disc_version_discovery_started", { path: "/discovery" });
+  const result = await discEngineGetRequest<unknown>("/discovery");
+  const versions = extractAssessmentVersions(result);
 
+  if (versions.length === 0) {
+    logServerEvent("error", "disc_version_discovery_empty", {
+      hasResult: Boolean(result),
+      resultKeys: result && typeof result === "object" ? Object.keys(result as Record<string, unknown>).slice(0, 20) : [],
+    });
+    throw new DiscEngineError("No DISC assessment versions were returned by disc-engine discovery.");
+  }
+
+  logServerEvent("info", "disc_version_discovery_succeeded", {
+    versionCount: versions.length,
+    versions: versions.map((version) => ({
+      id: version.id,
+      displayName: version.displayName,
+      expectedQuestionCount: version.expectedQuestionCount,
+      estimatedDurationMinutes: version.estimatedDurationMinutes,
+      isDefault: version.isDefault,
+    })),
+  });
+
+  return versions;
+}
+
+export async function createDiscSession(input: CreateDiscSessionInput): Promise<CreateDiscSessionResponse> {
   const payload: CreateDiscSessionRequest = {
-    assessmentVersionId,
-    assessment_version_id: assessmentVersionId,
+    assessmentVersionId: input.assessmentVersionId,
+    assessment_version_id: input.assessmentVersionId,
     metadata: {
       source: "strandsbjerg",
       ...(input.initiatedByUserId ? { initiatedByUserId: input.initiatedByUserId } : {}),
@@ -409,6 +538,13 @@ export async function createDiscSession(input: CreateDiscSessionInput = {}): Pro
       ...(input.inviteToken ? { inviteToken: input.inviteToken } : {}),
     },
   };
+
+  logServerEvent("info", "disc_session_creation_started", {
+    assessmentVersionId: input.assessmentVersionId,
+    companyId: input.companyId ?? null,
+    hasInviteToken: Boolean(input.inviteToken),
+    initiatedByUserId: input.initiatedByUserId ?? null,
+  });
 
   const result = await discEngineRequest<unknown>("/sessions", payload);
   const sessionId = extractSessionIdFromCreateSessionResponse(result);
@@ -431,6 +567,11 @@ export async function createDiscSession(input: CreateDiscSessionInput = {}): Pro
     });
     throw new DiscEngineError("disc-engine /sessions returned an invalid payload");
   }
+
+  logServerEvent("info", "disc_session_creation_succeeded", {
+    assessmentVersionId: input.assessmentVersionId,
+    sessionId,
+  });
 
   if (!result || typeof result !== "object") {
     return { sessionId };

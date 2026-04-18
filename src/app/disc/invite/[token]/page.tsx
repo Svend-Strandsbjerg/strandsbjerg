@@ -3,8 +3,11 @@ import { notFound, redirect } from "next/navigation";
 
 import { InviteDiscClient } from "@/app/disc/invite/[token]/invite-disc-client";
 import { auth } from "@/lib/auth";
+import { DiscEngineError } from "@/lib/disc-engine";
 import { persistDiscInviteContext } from "@/lib/disc-invite-context";
 import { getInviteAccessState } from "@/lib/disc-invites";
+import { getInviteDiscVersionEntitlements } from "@/lib/disc-version-entitlements";
+import type { DiscVersionEntitlement } from "@/lib/disc-types";
 import { logServerEvent } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 
@@ -26,6 +29,9 @@ function inferOrigin(hostHeader: string | null) {
 export default async function InviteDiscPage({ params }: InviteDiscPageProps) {
   const { token } = await params;
   const session = await auth();
+  let versionEntitlements: DiscVersionEntitlement[] = [];
+  let autoSelectedAssessmentVersionId: string | null = null;
+  let versionDiscoveryError: string | null = null;
 
   await persistDiscInviteContext(token);
 
@@ -84,6 +90,18 @@ export default async function InviteDiscPage({ params }: InviteDiscPageProps) {
     );
   }
 
+  try {
+    const resolution = await getInviteDiscVersionEntitlements({
+      user: { id: session.user.id, role: session.user.role },
+      inviteToken: token,
+      companyId: invite.companyId,
+    });
+    versionEntitlements = resolution.visibleEntitlements;
+    autoSelectedAssessmentVersionId = resolution.autoSelectedAssessmentVersionId;
+  } catch (error) {
+    versionDiscoveryError = error instanceof DiscEngineError ? error.message : "Unable to load DISC assessment versions right now.";
+  }
+
   return (
     <div className="mx-auto max-w-3xl space-y-6 rounded-3xl border border-border/80 bg-card p-6 shadow-sm sm:p-8">
       <div className="space-y-2">
@@ -107,6 +125,9 @@ export default async function InviteDiscPage({ params }: InviteDiscPageProps) {
 
       <InviteDiscClient
         token={token}
+        versionEntitlements={versionEntitlements}
+        autoSelectedAssessmentVersionId={autoSelectedAssessmentVersionId}
+        versionDiscoveryError={versionDiscoveryError}
         inviteState={inviteState}
         candidateLabel={invite.candidateName ?? invite.candidateEmail ?? "kandidat"}
         companyLabel={invite.company?.name ?? null}
