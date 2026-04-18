@@ -57,7 +57,6 @@ export default async function CandidateResultPage({ params }: CandidateResultPag
         createdAt={assessment.createdAt}
         submittedAt={assessment.submittedAt}
         rawResponses={assessment.rawResponses}
-        externalSessionId={assessment.externalSessionId}
         identityLabel={assessment.candidateName ?? assessment.candidateEmail ?? "Kandidat"}
         companyLabel={assessment.company?.name}
         pdfHref={resultShare ? `/disc/result/${resultShare.token}/pdf` : undefined}

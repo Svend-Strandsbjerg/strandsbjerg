@@ -13,12 +13,38 @@ export type SharedDiscResultRecord = Prisma.AssessmentResultShareGetPayload<{
   };
 }>;
 
+export type PersonalDiscResultRecord = Prisma.DiscAssessmentGetPayload<{
+  select: {
+    id: true;
+    status: true;
+    externalSessionId: true;
+    createdAt: true;
+    submittedAt: true;
+    rawResponses: true;
+    promoRedemptionId: true;
+    userId: true;
+    resultShare: {
+      select: {
+        token: true;
+      };
+    };
+  };
+}>;
+
 export type SharedResultAccess =
   | { status: "missing" }
   | { status: "expired" }
   | {
       status: "ok";
       sharedResult: SharedDiscResultRecord;
+    };
+
+export type PersonalResultAccess =
+  | { status: "missing" }
+  | { status: "forbidden" }
+  | {
+      status: "ok";
+      assessment: PersonalDiscResultRecord;
     };
 
 export async function getSharedDiscResultAccess(token: string): Promise<SharedResultAccess> {
@@ -46,5 +72,39 @@ export async function getSharedDiscResultAccess(token: string): Promise<SharedRe
   return {
     status: "ok",
     sharedResult,
+  };
+}
+
+export async function getPersonalDiscResultAccess(userId: string, assessmentId: string): Promise<PersonalResultAccess> {
+  const assessment = await prisma.discAssessment.findUnique({
+    where: { id: assessmentId },
+    select: {
+      id: true,
+      status: true,
+      externalSessionId: true,
+      createdAt: true,
+      submittedAt: true,
+      rawResponses: true,
+      promoRedemptionId: true,
+      userId: true,
+      resultShare: {
+        select: {
+          token: true,
+        },
+      },
+    },
+  });
+
+  if (!assessment) {
+    return { status: "missing" };
+  }
+
+  if (assessment.userId !== userId) {
+    return { status: "forbidden" };
+  }
+
+  return {
+    status: "ok",
+    assessment,
   };
 }

@@ -202,7 +202,6 @@ export function InviteDiscClient({
           createdAt={latestAssessment.createdAt}
           submittedAt={latestAssessment.submittedAt}
           rawResponses={latestAssessment.rawResponses}
-          externalSessionId={latestAssessment.externalSessionId}
           identityLabel={candidateLabel}
           emptyMessage="This invite was completed, but the result payload is incomplete."
         />

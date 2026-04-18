@@ -1,5 +1,5 @@
 import type { SharedDiscResultRecord } from "@/lib/disc-result-access";
-import { buildDiscProfileSummary, buildDiscResultViewModel, calculateDiscPosition, type DiscDimension } from "@/lib/disc-result-insights";
+import { buildDiscProfilePresentation, buildDiscResultViewModel, calculateDiscPosition } from "@/lib/disc-result-insights";
 
 function escapePdfText(input: string) {
   return input.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
@@ -9,8 +9,8 @@ function rgb(color: { r: number; g: number; b: number }) {
   return `${color.r.toFixed(3)} ${color.g.toFixed(3)} ${color.b.toFixed(3)}`;
 }
 
-function formatDateTime(value: Date) {
-  return new Intl.DateTimeFormat("da-DK", { dateStyle: "medium", timeStyle: "short" }).format(value);
+function formatDate(value: Date) {
+  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(value);
 }
 
 function formatDimensionValue(value: number | null) {
@@ -21,7 +21,7 @@ function formatDimensionValue(value: number | null) {
   return Number.isInteger(value) ? `${value}` : value.toFixed(2);
 }
 
-function wrapText(text: string, limit = 78) {
+function wrapText(text: string, limit = 74) {
   const words = text.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
   let current = "";
@@ -43,32 +43,6 @@ function wrapText(text: string, limit = 78) {
   return lines;
 }
 
-function getTopDimension(dimensionScores: Record<DiscDimension, number | null>) {
-  return (["D", "I", "S", "C"] as const)
-    .map((dimension) => ({ dimension, score: dimensionScores[dimension] ?? Number.NEGATIVE_INFINITY }))
-    .sort((a, b) => b.score - a.score)[0]?.dimension ?? null;
-}
-
-function buildPrimaryTraits(dimensionScores: Record<DiscDimension, number | null>) {
-  const top = getTopDimension(dimensionScores);
-
-  if (top === "D") {
-    return ["Handlekraftig", "Resultatorienteret", "Beslutningsstærk"];
-  }
-  if (top === "I") {
-    return ["Energisk", "Relationel", "Overbevisende"];
-  }
-  if (top === "S") {
-    return ["Stabil", "Loyal", "Samarbejdsorienteret"];
-  }
-  if (top === "C") {
-    return ["Analytisk", "Struktureret", "Kvalitetsbevidst"];
-  }
-
-  return ["Fleksibel", "Balanceret", "Tilpasningsdygtig"];
-}
-
-
 function circlePath(x: number, y: number, radius: number) {
   const kappa = 0.552284749831;
   const c = radius * kappa;
@@ -79,7 +53,7 @@ function circlePath(x: number, y: number, radius: number) {
     `${(x + c).toFixed(2)} ${(y + radius).toFixed(2)} ${(x + radius).toFixed(2)} ${(y + c).toFixed(2)} ${(x + radius).toFixed(2)} ${y.toFixed(2)} c`,
     `${(x + radius).toFixed(2)} ${(y - c).toFixed(2)} ${(x + c).toFixed(2)} ${(y - radius).toFixed(2)} ${x.toFixed(2)} ${(y - radius).toFixed(2)} c`,
     `${(x - c).toFixed(2)} ${(y - radius).toFixed(2)} ${(x - radius).toFixed(2)} ${(y - c).toFixed(2)} ${(x - radius).toFixed(2)} ${y.toFixed(2)} c`,
-    'h',
+    "h",
   ];
 }
 
@@ -118,9 +92,9 @@ export function createDiscResultPdf(shared: SharedDiscResultRecord) {
   const completionDate = assessment.submittedAt ?? assessment.createdAt;
   const viewModel = buildDiscResultViewModel(assessment.rawResponses);
   const placement = calculateDiscPosition(viewModel.dimensionScores);
-  const profileSummary = buildDiscProfileSummary(viewModel);
-  const summaryLines = wrapText(profileSummary, 78);
-  const primaryTraits = buildPrimaryTraits(viewModel.dimensionScores);
+  const profile = buildDiscProfilePresentation(viewModel);
+  const summaryLines = wrapText(profile.summary, 72).slice(0, 6);
+  const explanatoryLines = wrapText(profile.explanatoryNote, 72).slice(0, 3);
 
   const colors = {
     D: { r: 0.937, g: 0.267, b: 0.267 },
@@ -131,8 +105,8 @@ export function createDiscResultPdf(shared: SharedDiscResultRecord) {
 
   const square = {
     left: 72,
-    bottom: 418,
-    size: 280,
+    bottom: 430,
+    size: 240,
   };
   const half = square.size / 2;
 
@@ -144,44 +118,42 @@ export function createDiscResultPdf(shared: SharedDiscResultRecord) {
     textLines.push("BT", `/${font} ${size} Tf`, `${x} ${y} Td`, `(${escapePdfText(line)}) Tj`, "ET");
   };
 
-  pushText("F2", 30, 72, 785, "DISC Profil");
-  pushText("F1", 10, 72, 767, "Executive summary");
-  pushText("F1", 10, 72, 744, `Navn: ${assessment.candidateName ?? assessment.company?.name ?? "Kandidat"}`);
-  pushText("F1", 10, 300, 744, `Dato: ${formatDateTime(completionDate)}`);
+  pushText("F2", 26, 72, 785, "Your DISC Profile");
+  pushText("F1", 10, 72, 766, "Strandsbjerg DISC Report");
+  pushText("F1", 10, 72, 742, `Profile: ${profile.profileTitle} (${profile.profileLabel})`);
+  pushText("F1", 10, 72, 726, `Generated: ${formatDate(completionDate)}`);
+  pushText("F1", 10, 72, 710, `Name: ${assessment.candidateName ?? assessment.candidateEmail ?? "Personal profile"}`);
 
-  pushText("F2", 11, 382, 678, "Vægtning");
-  pushText("F1", 10, 382, 660, `D  ${formatDimensionValue(viewModel.dimensionScores.D)}`);
-  pushText("F1", 10, 382, 644, `I  ${formatDimensionValue(viewModel.dimensionScores.I)}`);
-  pushText("F1", 10, 382, 628, `S  ${formatDimensionValue(viewModel.dimensionScores.S)}`);
-  pushText("F1", 10, 382, 612, `C  ${formatDimensionValue(viewModel.dimensionScores.C)}`);
-  pushText("F1", 9, 382, 586, `Spot: x ${placement.x.toFixed(2)}, y ${placement.y.toFixed(2)}`);
+  pushText("F2", 11, 352, 665, "Weighting");
+  pushText("F1", 10, 352, 647, `D  ${formatDimensionValue(viewModel.dimensionScores.D)}`);
+  pushText("F1", 10, 352, 631, `I  ${formatDimensionValue(viewModel.dimensionScores.I)}`);
+  pushText("F1", 10, 352, 615, `S  ${formatDimensionValue(viewModel.dimensionScores.S)}`);
+  pushText("F1", 10, 352, 599, `C  ${formatDimensionValue(viewModel.dimensionScores.C)}`);
 
-  pushText("F2", 11, 382, 548, "Primære karaktertræk");
-  let traitY = 531;
-  for (const trait of primaryTraits) {
-    pushText("F1", 10, 396, traitY, `- ${trait}`);
-    traitY -= 16;
+  pushText("F2", 11, 72, 394, "Profile summary");
+  let summaryY = 376;
+  for (const line of summaryLines) {
+    pushText("F1", 10, 72, summaryY, line);
+    summaryY -= 15;
   }
 
-  pushText("F2", 11, 72, 356, "Profile Summary");
-  let y = 338;
-  for (const line of summaryLines.slice(0, 5)) {
-    pushText("F1", 10, 72, y, line);
-    y -= 15;
+  pushText("F2", 11, 72, 278, "How to use this result");
+  let noteY = 260;
+  for (const line of explanatoryLines) {
+    pushText("F1", 9, 72, noteY, line);
+    noteY -= 14;
   }
 
-  pushText("F1", 9, 72, 56, "Strandsbjerg · DISC rapport");
+  pushText("F1", 9, 72, 56, "Strandsbjerg · DISC profile report");
 
   const stream = [
-    // Header accents and section cards
     "0.96 0.97 0.99 rg",
     "72 758 451 32 re f",
     "0.95 0.96 0.98 rg",
-    "372 568 151 128 re f",
+    "342 568 181 112 re f",
     "0.95 0.96 0.98 rg",
-    "72 308 451 64 re f",
+    "72 234 451 182 re f",
 
-    // DISC square quadrants
     `${rgb(colors.D)} rg`,
     `${square.left} ${square.bottom + half} ${half} ${half} re f`,
     `${rgb(colors.I)} rg`,
@@ -191,21 +163,18 @@ export function createDiscResultPdf(shared: SharedDiscResultRecord) {
     `${rgb(colors.S)} rg`,
     `${square.left + half} ${square.bottom} ${half} ${half} re f`,
 
-    // Borders / axes
     "0.25 0.28 0.34 RG",
     "1.2 w",
     `${square.left} ${square.bottom} ${square.size} ${square.size} re S`,
     `${square.left + half} ${square.bottom} m ${square.left + half} ${square.bottom + square.size} l S`,
     `${square.left} ${square.bottom + half} m ${square.left + square.size} ${square.bottom + half} l S`,
 
-    // Quadrant labels
     ...textLines,
-    "BT /F2 16 Tf 88 677 Td (D) Tj ET",
-    "BT /F2 16 Tf 334 677 Td (I) Tj ET",
-    "BT /F2 16 Tf 88 431 Td (C) Tj ET",
-    "BT /F2 16 Tf 334 431 Td (S) Tj ET",
+    "BT /F2 14 Tf 86 650 Td (D) Tj ET",
+    "BT /F2 14 Tf 302 650 Td (I) Tj ET",
+    "BT /F2 14 Tf 86 434 Td (C) Tj ET",
+    "BT /F2 14 Tf 302 434 Td (S) Tj ET",
 
-    // Marker
     "0.07 0.10 0.16 rg",
     ...circlePath(markerX, markerY, 7),
     "f",
