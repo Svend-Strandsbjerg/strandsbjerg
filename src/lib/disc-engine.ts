@@ -5,10 +5,14 @@ import { logServerEvent } from "@/lib/logger";
 
 export type DiscEngineSessionMetadata = {
   source: "strandsbjerg";
+  initiatedByUserId?: string;
+  companyId?: string;
+  inviteToken?: string;
 };
 
 export type CreateDiscSessionRequest = {
   assessmentVersionId: string;
+  assessment_version_id: string;
   metadata: DiscEngineSessionMetadata;
 };
 
@@ -51,6 +55,36 @@ class DiscEngineError extends Error {
   }
 }
 
+function sanitizeForLog(value: unknown, depth = 0): unknown {
+  if (depth > 4) {
+    return "[max-depth]";
+  }
+
+  if (value === null || value === undefined) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    return value.length > 900 ? `${value.slice(0, 900)}…` : value;
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.slice(0, 25).map((entry) => sanitizeForLog(entry, depth + 1));
+  }
+
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const entries = Object.entries(record).slice(0, 40).map(([key, entry]) => [key, sanitizeForLog(entry, depth + 1)]);
+    return Object.fromEntries(entries);
+  }
+
+  return String(value);
+}
+
 function getRequiredEnv(name: "DISC_ENGINE_BASE_URL" | "DISC_ENGINE_API_KEY" | "DISC_ENGINE_ASSESSMENT_VERSION_ID") {
   const value = process.env[name];
 
@@ -59,6 +93,12 @@ function getRequiredEnv(name: "DISC_ENGINE_BASE_URL" | "DISC_ENGINE_API_KEY" | "
   }
 
   return value;
+}
+
+function buildDiscEngineUrl(baseUrl: string, path: string) {
+  const normalizedBase = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
+  const normalizedPath = path.startsWith("/") ? path.slice(1) : path;
+  return new URL(normalizedPath, normalizedBase).toString();
 }
 
 export function validateDiscResponses(payload: unknown): DiscResponseInput[] {
@@ -109,11 +149,28 @@ export function validateDiscResponses(payload: unknown): DiscResponseInput[] {
 async function discEngineRequest<TResponse>(path: string, payload: unknown): Promise<TResponse> {
   const apiKey = getRequiredEnv("DISC_ENGINE_API_KEY");
   const baseUrl = getRequiredEnv("DISC_ENGINE_BASE_URL");
+  const url = buildDiscEngineUrl(baseUrl, path);
 
   let response: Response;
 
+  logServerEvent("info", "disc_engine_request_payload", {
+    url,
+    path,
+    method: "POST",
+    baseUrlHost: (() => {
+      try {
+        return new URL(baseUrl).host;
+      } catch {
+        return "invalid";
+      }
+    })(),
+    hasApiKey: Boolean(apiKey),
+    apiKeyLength: apiKey.length,
+    payload: sanitizeForLog(payload),
+  });
+
   try {
-    response = await fetch(`${baseUrl}${path}`, {
+    response = await fetch(url, {
       method: "POST",
       headers: {
         "x-api-key": apiKey,
@@ -134,6 +191,12 @@ async function discEngineRequest<TResponse>(path: string, payload: unknown): Pro
     parsedBody = null;
   }
 
+  logServerEvent("info", "disc_engine_response_payload", {
+    path,
+    status: response.status,
+    body: sanitizeForLog(parsedBody),
+  });
+
   if (!response.ok) {
     logServerEvent("error", "disc_engine_non_ok_response", {
       path,
@@ -149,11 +212,27 @@ async function discEngineRequest<TResponse>(path: string, payload: unknown): Pro
 async function discEngineGetRequest<TResponse>(path: string): Promise<TResponse> {
   const apiKey = getRequiredEnv("DISC_ENGINE_API_KEY");
   const baseUrl = getRequiredEnv("DISC_ENGINE_BASE_URL");
+  const url = buildDiscEngineUrl(baseUrl, path);
 
   let response: Response;
 
+  logServerEvent("info", "disc_engine_request_payload", {
+    url,
+    path,
+    method: "GET",
+    baseUrlHost: (() => {
+      try {
+        return new URL(baseUrl).host;
+      } catch {
+        return "invalid";
+      }
+    })(),
+    hasApiKey: Boolean(apiKey),
+    apiKeyLength: apiKey.length,
+  });
+
   try {
-    response = await fetch(`${baseUrl}${path}`, {
+    response = await fetch(url, {
       method: "GET",
       headers: {
         "x-api-key": apiKey,
@@ -171,6 +250,12 @@ async function discEngineGetRequest<TResponse>(path: string): Promise<TResponse>
   } catch {
     parsedBody = null;
   }
+
+  logServerEvent("info", "disc_engine_response_payload", {
+    path,
+    status: response.status,
+    body: sanitizeForLog(parsedBody),
+  });
 
   if (!response.ok) {
     logServerEvent("error", "disc_engine_non_ok_response", {
@@ -305,13 +390,23 @@ function extractQuestionsFromPayload(payload: unknown): DiscQuestion[] {
   return [];
 }
 
-export async function createDiscSession(): Promise<CreateDiscSessionResponse> {
+type CreateDiscSessionInput = {
+  initiatedByUserId?: string | null;
+  companyId?: string | null;
+  inviteToken?: string | null;
+};
+
+export async function createDiscSession(input: CreateDiscSessionInput = {}): Promise<CreateDiscSessionResponse> {
   const assessmentVersionId = getRequiredEnv("DISC_ENGINE_ASSESSMENT_VERSION_ID");
 
   const payload: CreateDiscSessionRequest = {
     assessmentVersionId,
+    assessment_version_id: assessmentVersionId,
     metadata: {
       source: "strandsbjerg",
+      ...(input.initiatedByUserId ? { initiatedByUserId: input.initiatedByUserId } : {}),
+      ...(input.companyId ? { companyId: input.companyId } : {}),
+      ...(input.inviteToken ? { inviteToken: input.inviteToken } : {}),
     },
   };
 

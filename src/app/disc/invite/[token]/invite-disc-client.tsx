@@ -274,6 +274,12 @@ export function InviteDiscClient({ token, candidateLabel, companyLabel, inviteSt
             <h2 className="mt-2 text-xl font-semibold">Svar intuitivt og ærligt</h2>
             <p className="mt-2 text-sm text-muted-foreground">Du får ét spørgsmål ad gangen. Vælg det svar der føles mest rigtigt med det samme.</p>
             <p className="mt-2 text-sm font-medium text-foreground">Tager ca. 2–3 minutter.</p>
+            {startState.status === "error" ? (
+              <div className="mt-4 rounded-lg border border-destructive/40 bg-destructive/5 p-3" role="alert" aria-live="polite">
+                <p className="text-sm font-medium text-destructive">Kunne ikke starte testen</p>
+                <p className="mt-1 text-sm text-destructive/90">{startState.message}</p>
+              </div>
+            ) : null}
             <div className="mt-5 flex items-center justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setIsStartModalOpen(false)}>
                 Luk

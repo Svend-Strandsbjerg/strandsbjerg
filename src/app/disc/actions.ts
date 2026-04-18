@@ -68,7 +68,9 @@ export async function startDiscAssessment(_: DiscFlowState): Promise<DiscFlowSta
   }
 
   try {
-    const createdSession = await createDiscSession();
+    const createdSession = await createDiscSession({
+      initiatedByUserId: session?.user?.id ?? null,
+    });
     const questions = await getDiscSessionQuestions(createdSession.sessionId);
     await createDiscAssessmentRecord({
       externalSessionId: createdSession.sessionId,

@@ -128,7 +128,11 @@ export async function startInviteDiscAssessment(_: InviteDiscState, formData: Fo
       };
     }
 
-    const createdSession = await createDiscSession();
+    const createdSession = await createDiscSession({
+      initiatedByUserId: userId,
+      companyId: invite.companyId,
+      inviteToken: token,
+    });
     const questions = await getDiscSessionQuestions(createdSession.sessionId);
     await createDiscAssessmentRecord({
       externalSessionId: createdSession.sessionId,
