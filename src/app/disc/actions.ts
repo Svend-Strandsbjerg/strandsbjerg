@@ -18,6 +18,7 @@ import {
 import { extractCanonicalResult } from "@/lib/disc-result-insights";
 import { assertSelectableVersion, getPersonalDiscVersionEntitlements } from "@/lib/disc-version-entitlements";
 import { logServerEvent } from "@/lib/logger";
+import { prisma } from "@/lib/prisma";
 import { enforceRateLimit } from "@/lib/rate-limit";
 
 const DISC_SESSION_COOKIE = "disc_session_id";
@@ -54,6 +55,14 @@ export async function startDiscAssessment(_: DiscFlowState, formData: FormData):
   });
 
   let entitlement;
+  let resolutionSummary:
+    | {
+        source: string;
+        maxTier: string;
+        selectableVersionIds: string[];
+        visibleVersionIds: string[];
+      }
+    | undefined;
   try {
     const resolution = await getPersonalDiscVersionEntitlements({
       user: {
@@ -61,6 +70,12 @@ export async function startDiscAssessment(_: DiscFlowState, formData: FormData):
         role: session?.user?.role ?? "USER",
       },
     });
+    resolutionSummary = {
+      source: resolution.policy.source,
+      maxTier: resolution.policy.maxTier,
+      selectableVersionIds: resolution.selectableEntitlements.map((item) => item.version.id),
+      visibleVersionIds: resolution.visibleEntitlements.map((item) => item.version.id),
+    };
     entitlement = assertSelectableVersion(resolution, selectedAssessmentVersionId);
   } catch (error) {
     logServerEvent("error", "disc_flow_version_entitlements_failed", {
@@ -81,10 +96,15 @@ export async function startDiscAssessment(_: DiscFlowState, formData: FormData):
       userId,
       assessmentVersionId: selectedAssessmentVersionId,
       reason: "not_entitled",
+      entitlementSource: resolutionSummary?.source ?? null,
+      entitlementMaxTier: resolutionSummary?.maxTier ?? null,
+      selectableVersionIds: resolutionSummary?.selectableVersionIds ?? [],
+      visibleVersionIds: resolutionSummary?.visibleVersionIds ?? [],
+      flow: "personal",
     });
     return {
       status: "error",
-      message: "Du har ikke adgang til den valgte DISC-version.",
+      message: "Den valgte DISC-version er ikke tilgængelig for din konto. Vælg en tilgængelig version.",
       sessionId: "",
       questions: [],
     };
@@ -92,6 +112,20 @@ export async function startDiscAssessment(_: DiscFlowState, formData: FormData):
 
   if (existingSessionId && existingSessionId !== submittedSessionId) {
     try {
+      const matchingSessionAssessment = await prisma.discAssessment.findUnique({
+        where: { externalSessionId: existingSessionId },
+        select: { assessmentVersionId: true, userId: true },
+      });
+
+      const canReuse = Boolean(
+        matchingSessionAssessment &&
+          matchingSessionAssessment.userId === (session?.user?.id ?? null) &&
+          matchingSessionAssessment.assessmentVersionId === selectedAssessmentVersionId,
+      );
+
+      if (!canReuse) {
+        cookieStore.delete(DISC_SESSION_COOKIE);
+      } else {
       const questions = await getDiscSessionQuestions(existingSessionId);
       logServerEvent("info", "disc_flow_session_reused", { userId, sessionId: existingSessionId, questionCount: questions.length });
       return {
@@ -100,6 +134,7 @@ export async function startDiscAssessment(_: DiscFlowState, formData: FormData):
         sessionId: existingSessionId,
         questions,
       };
+      }
     } catch (error) {
       return {
         status: "error",

@@ -73,6 +73,7 @@ async function getActiveInviteOrThrow(token: string) {
 export async function startInviteDiscAssessment(_: InviteDiscState, formData: FormData): Promise<InviteDiscState> {
   const session = await auth();
   const userId = session?.user?.id;
+  const userRole = session?.user?.role ?? "USER";
   const token = String(formData.get("token") ?? "").trim();
   const selectedAssessmentVersionId = String(formData.get("assessmentVersionId") ?? "").trim();
 
@@ -106,12 +107,26 @@ export async function startInviteDiscAssessment(_: InviteDiscState, formData: Fo
   try {
     const invite = await getActiveInviteOrThrow(token);
     let entitlement = null;
+    let resolutionSummary:
+      | {
+          source: string;
+          maxTier: string;
+          selectableVersionIds: string[];
+          visibleVersionIds: string[];
+        }
+      | undefined;
     try {
       const resolution = await getInviteDiscVersionEntitlements({
-        user: { id: userId, role: session.user.role },
+        user: { id: userId, role: userRole },
         inviteToken: token,
         companyId: invite.companyId,
       });
+      resolutionSummary = {
+        source: resolution.policy.source,
+        maxTier: resolution.policy.maxTier,
+        selectableVersionIds: resolution.selectableEntitlements.map((item) => item.version.id),
+        visibleVersionIds: resolution.visibleEntitlements.map((item) => item.version.id),
+      };
       entitlement = assertSelectableVersion(resolution, selectedAssessmentVersionId);
     } catch (error) {
       logServerEvent("error", "disc_invite_version_entitlements_failed", {
@@ -132,12 +147,18 @@ export async function startInviteDiscAssessment(_: InviteDiscState, formData: Fo
       logServerEvent("warn", "disc_invite_session_create_denied", {
         inviteToken: token,
         userId,
+        companyId: invite.companyId,
         assessmentVersionId: selectedAssessmentVersionId,
         reason: "not_entitled",
+        entitlementSource: resolutionSummary?.source ?? null,
+        entitlementMaxTier: resolutionSummary?.maxTier ?? null,
+        selectableVersionIds: resolutionSummary?.selectableVersionIds ?? [],
+        visibleVersionIds: resolutionSummary?.visibleVersionIds ?? [],
+        flow: "invite",
       });
       return {
         status: "error",
-        message: "Du har ikke adgang til den valgte DISC-version.",
+        message: "Denne invitation giver ikke adgang til den valgte DISC-version. Vælg en tilgængelig version.",
         sessionId: "",
         questions: [],
       };
@@ -157,6 +178,22 @@ export async function startInviteDiscAssessment(_: InviteDiscState, formData: Fo
     if (existingAssessment) {
       if (existingAssessment.userId && existingAssessment.userId !== userId) {
         return { status: "error", message: "Invitationen er allerede knyttet til en anden bruger.", sessionId: "", questions: [] };
+      }
+
+      if (existingAssessment.externalSessionId && existingAssessment.userId === userId && selectedAssessmentVersionId) {
+        const existingVersion = await prisma.discAssessment.findUnique({
+          where: { externalSessionId: existingAssessment.externalSessionId },
+          select: { assessmentVersionId: true },
+        });
+
+        if (existingVersion?.assessmentVersionId !== selectedAssessmentVersionId) {
+          return {
+            status: "error",
+            message: "Invitationen har allerede en aktiv session i en anden DISC-version.",
+            sessionId: "",
+            questions: [],
+          };
+        }
       }
 
       if (!existingAssessment.userId) {
