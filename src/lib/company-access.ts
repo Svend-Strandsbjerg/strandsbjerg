@@ -1,12 +1,12 @@
 import "server-only";
 
-import { type Company, type CompanyLicenseStatus, type CompanyRole, type CompanyStatus } from "@prisma/client";
+import { CompanyLicenseStatus, CompanyRole, CompanyStatus, type Company } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 
-const COMPANY_ACCESS_ROLES: CompanyRole[] = ["COMPANY_ADMIN", "COMPANY_VIEWER"];
-const ACTIVE_COMPANY_STATUSES: CompanyStatus[] = ["ACTIVE"];
-const ACTIVE_COMPANY_LICENSE_STATUSES: CompanyLicenseStatus[] = ["ACTIVE", "TRIAL"];
+const COMPANY_ACCESS_ROLES = [CompanyRole.COMPANY_ADMIN, CompanyRole.COMPANY_VIEWER] as const;
+const ACTIVE_COMPANY_STATUSES = [CompanyStatus.ACTIVE] as const;
+const ACTIVE_COMPANY_LICENSE_STATUSES = [CompanyLicenseStatus.ACTIVE, CompanyLicenseStatus.TRIAL] as const;
 
 export function canSelfServiceCreateCompany() {
   return process.env.DISC_COMPANY_SELF_SERVICE_CREATION === "true";
@@ -43,12 +43,12 @@ export async function getUserCompanyRole(userId: string, companyId: string): Pro
 }
 
 export async function isCompanyAdmin(userId: string, companyId: string): Promise<boolean> {
-  return (await getUserCompanyRole(userId, companyId)) === "COMPANY_ADMIN";
+  return (await getUserCompanyRole(userId, companyId)) === CompanyRole.COMPANY_ADMIN;
 }
 
 export async function isCompanyViewer(userId: string, companyId: string): Promise<boolean> {
   const role = await getUserCompanyRole(userId, companyId);
-  return role === "COMPANY_ADMIN" || role === "COMPANY_VIEWER";
+  return role === CompanyRole.COMPANY_ADMIN || role === CompanyRole.COMPANY_VIEWER;
 }
 
 export async function canAccessCompanyArea(userId: string) {

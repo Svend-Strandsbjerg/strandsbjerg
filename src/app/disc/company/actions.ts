@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
-import { AssessmentInviteStatus } from "@prisma/client";
+import { AssessmentInviteStatus, CompanyRole } from "@prisma/client";
 
 import { requireUser } from "@/lib/access";
 import { canCreateCompanyProfile, canManageCompany } from "@/lib/company-access";
@@ -364,7 +364,7 @@ export async function createCompanyProfile(
         memberships: {
           create: {
             userId: user.id,
-            role: "COMPANY_ADMIN",
+            role: CompanyRole.COMPANY_ADMIN,
           },
         },
       },
