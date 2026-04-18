@@ -11,6 +11,7 @@ import {
   resendAssessmentInviteEmail,
   resendAssessmentResultEmail,
   updateCompanyDiscTierAccess,
+  updateUserDiscTierOverride,
 } from "@/app/disc/company/actions";
 import { initialCompanyInviteActionState } from "@/app/disc/company/action-state";
 import { Button } from "@/components/ui/button";
@@ -80,6 +81,15 @@ type CompanyDiscAdminProps = {
         token: string;
         expiresAt: Date | null;
       } | null;
+    }>;
+    memberships: Array<{
+      userId: string;
+      role: CompanyRole;
+      user: {
+        name: string | null;
+        email: string | null;
+        discMaxTierOverride: "FREE" | "STANDARD" | "DEEP" | null;
+      };
     }>;
   }>;
   origin: string;
@@ -171,6 +181,7 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
   const [resendInviteState, resendInviteAction] = useActionState(resendAssessmentInviteEmail, initialCompanyInviteActionState);
   const [resendState, resendAction] = useActionState(resendAssessmentResultEmail, initialCompanyInviteActionState);
   const [tierAccessState, tierAccessAction] = useActionState(updateCompanyDiscTierAccess, initialCompanyInviteActionState);
+  const [userTierAccessState, userTierAccessAction] = useActionState(updateUserDiscTierOverride, initialCompanyInviteActionState);
   const [lastCreatedCompanyId, setLastCreatedCompanyId] = useState<string | null>(null);
 
   const infoState = useMemo(() => {
@@ -185,6 +196,9 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
     if (tierAccessState.status !== "idle") {
       return tierAccessState;
     }
+    if (userTierAccessState.status !== "idle") {
+      return userTierAccessState;
+    }
 
     if (invalidateState.status !== "idle") {
       return invalidateState;
@@ -194,7 +208,7 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
     }
 
     return createState;
-  }, [createState, invalidateState, promoCreateState, resendInviteState, resendState, tierAccessState]);
+  }, [createState, invalidateState, promoCreateState, resendInviteState, resendState, tierAccessState, userTierAccessState]);
 
   return (
     <div className="space-y-6">
@@ -265,7 +279,7 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
                 href={`/disc/company/compare?companyId=${encodeURIComponent(company.id)}`}
                 className="inline-flex h-9 items-center rounded-md border border-input bg-background px-4 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
               >
-                Open comparison
+                Åbn sammenligning
               </Link>
             </div>
 
@@ -280,7 +294,7 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
                     defaultValue={company.discMaxTierAccess}
                     className="h-9 rounded-md border border-input bg-background px-3 text-sm"
                   >
-                    <option value="FREE">Free</option>
+                    <option value="FREE">Gratis</option>
                     <option value="STANDARD">Standard</option>
                     <option value="DEEP">Deep</option>
                   </select>
@@ -291,6 +305,60 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
               ) : (
                 <p className="mt-2 text-xs text-muted-foreground">Nuværende adgang: {company.discMaxTierAccess}. Kun Company Admin kan ændre denne indstilling.</p>
               )}
+            </div>
+
+            <div className="mt-4 rounded-xl border border-border/80 bg-muted/20 p-4">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">Bruger-specifik DISC-adgang</h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Her kan du sætte en personlig override pr. bruger. “Arv virksomhed” betyder at brugeren følger virksomhedens standardniveau.
+              </p>
+              <div className="mt-3 overflow-x-auto rounded-xl border border-border/70">
+                <table className="min-w-full divide-y divide-border/70 text-sm">
+                  <thead className="bg-muted/40 text-left text-xs uppercase tracking-[0.12em] text-muted-foreground">
+                    <tr>
+                      <th className="px-3 py-2 font-medium">Bruger</th>
+                      <th className="px-3 py-2 font-medium">Rolle</th>
+                      <th className="px-3 py-2 font-medium">Aktuel override</th>
+                      <th className="px-3 py-2 font-medium">Opdater</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/60">
+                    {company.memberships.map((membership) => (
+                      <tr key={membership.userId}>
+                        <td className="px-3 py-3">
+                          <p className="font-medium">{membership.user.name ?? "Navn mangler"}</p>
+                          <p className="text-xs text-muted-foreground">{membership.user.email ?? "Email mangler"}</p>
+                        </td>
+                        <td className="px-3 py-3 text-muted-foreground">{membership.role === "COMPANY_ADMIN" ? "Company admin" : "Company viewer"}</td>
+                        <td className="px-3 py-3 text-muted-foreground">{membership.user.discMaxTierOverride ?? "Arv virksomhed"}</td>
+                        <td className="px-3 py-3">
+                          {canManageCompany(company.membershipRole) ? (
+                            <form action={userTierAccessAction} className="flex items-center gap-2">
+                              <input type="hidden" name="companyId" value={company.id} />
+                              <input type="hidden" name="targetUserId" value={membership.userId} />
+                              <select
+                                name="discMaxTierOverride"
+                                defaultValue={membership.user.discMaxTierOverride ?? "INHERIT"}
+                                className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                              >
+                                <option value="INHERIT">Arv virksomhed</option>
+                                <option value="FREE">Gratis</option>
+                                <option value="STANDARD">Standard</option>
+                                <option value="DEEP">Deep</option>
+                              </select>
+                              <Button type="submit" variant="outline" className="h-8 text-xs">
+                                Gem
+                              </Button>
+                            </form>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Kun læseadgang</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {canManageCompany(company.membershipRole) ? (
@@ -316,8 +384,8 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
             )}
 
             <div className="mt-5 rounded-2xl border border-border/80 bg-muted/20 p-4">
-              <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">Public DISC signup links</h3>
-              <p className="mt-2 text-sm text-muted-foreground">Opret delbare kampagne-links, hvor brugere kan oprette konto og få én gratis DISC-kredit.</p>
+              <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">Public DISC signup links (admin)</h3>
+              <p className="mt-2 text-sm text-muted-foreground">Opret delbare promo-links til særskilte onboarding-kampagner.</p>
 
               {canManageCompany(company.membershipRole) ? (
                 <form action={promoCreateAction} className="mt-3 grid gap-3 md:grid-cols-4">

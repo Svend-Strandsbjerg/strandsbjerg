@@ -39,7 +39,19 @@ export async function GET(_: Request, context: { params: Promise<{ token: string
       });
     }
 
-    const reportTier = await getDiscReportTierForAssessmentVersionId(access.sharedResult.assessment.assessmentVersionId);
+    let reportTier: "free" | "standard" | "deep" = "free";
+    try {
+      reportTier = await getDiscReportTierForAssessmentVersionId(access.sharedResult.assessment.assessmentVersionId);
+    } catch (error) {
+      logServerEvent("warn", "disc_result_pdf_report_tier_fallback_used", {
+        resultToken: token,
+        assessmentId: access.sharedResult.assessmentId,
+        assessmentVersionId: access.sharedResult.assessment.assessmentVersionId,
+        fallbackTier: "free",
+        error,
+      });
+    }
+
     const { pdfBytes } = createDiscResultPdf(access.sharedResult, { reportTier });
 
     return new NextResponse(pdfBytes, {

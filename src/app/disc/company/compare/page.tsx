@@ -63,16 +63,16 @@ export default async function CompanyComparisonPage({ searchParams }: CompanyCom
   return (
     <div className="mx-auto max-w-6xl space-y-5 rounded-3xl border border-border/80 bg-card p-6 shadow-sm sm:p-8">
       <header className="space-y-2 border-b border-border/70 pb-4">
-        <h1 className="text-2xl font-semibold tracking-tight">Company DISC comparison</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Virksomhed · DISC-sammenligning</h1>
         <p className="text-sm text-muted-foreground">
-          Compare completed DISC profiles for people inside {companyAccess.company.name}. Access is limited to your authorized company scope.
+          Sammenlign gennemførte DISC-profiler for personer i {companyAccess.company.name}. Adgang er begrænset til din godkendte virksomhedskontekst.
         </p>
       </header>
 
       <section className="rounded-xl border border-border/70 bg-muted/20 p-4">
-        <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Select profiles</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Vælg profiler</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          For each person, the latest completed assessment is used (deterministic by submitted date, newest first).
+          For hver person bruges den seneste gennemførte besvarelse (sorteret efter indsendelsesdato, nyeste først).
         </p>
         <form className="mt-4 space-y-3">
           <input type="hidden" name="companyId" value={selectedCompanyId} />
@@ -97,13 +97,13 @@ export default async function CompanyComparisonPage({ searchParams }: CompanyCom
               type="submit"
               className="inline-flex h-9 items-center rounded-md border border-input bg-background px-4 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
             >
-              Compare selected
+              Sammenlign valgte
             </button>
             <Link
               href={`/disc/company/compare?companyId=${encodeURIComponent(selectedCompanyId)}`}
               className="inline-flex h-9 items-center rounded-md border border-input bg-background px-4 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
             >
-              Clear selection
+              Nulstil valg
             </Link>
           </div>
         </form>
@@ -111,12 +111,12 @@ export default async function CompanyComparisonPage({ searchParams }: CompanyCom
 
       {selectedCandidates.length < 2 ? (
         <section className="rounded-xl border border-dashed border-border/80 bg-background/40 p-5 text-sm text-muted-foreground">
-          Select at least two people to open the side-by-side comparison view.
+          Vælg mindst to personer for at åbne side-om-side sammenligningen.
         </section>
       ) : (
         <>
           <section className="rounded-xl border border-border/70 p-4">
-            <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Comparison summary</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Sammenfatning</h2>
             <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
               <li>{comparisonSummary.paceObservation}</li>
               <li>{comparisonSummary.styleObservation}</li>
@@ -129,15 +129,15 @@ export default async function CompanyComparisonPage({ searchParams }: CompanyCom
             {selectedCandidates.map((candidate) => (
               <DiscResultPresentation
                 key={candidate.assessmentId}
-                title="DISC profile"
+                title="DISC-profil"
                 status={candidate.status}
                 createdAt={candidate.submittedAt ?? new Date(0)}
                 submittedAt={candidate.submittedAt}
                 rawResponses={candidate.rawResponses}
                 identityLabel={candidate.displayName}
                 variant="compact"
-                emptyMessage="Result data is missing for this profile."
-                footerNote="Internal company comparison view."
+                emptyMessage="Der mangler resultatdata for denne profil."
+                footerNote="Intern visning til virksomhedssammenligning."
               />
             ))}
           </section>
@@ -149,7 +149,7 @@ export default async function CompanyComparisonPage({ searchParams }: CompanyCom
           href="/disc/company"
           className="inline-flex h-9 items-center rounded-md border border-input bg-background px-4 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
         >
-          Back to company overview
+          Tilbage til virksomheds-overblik
         </Link>
       </div>
     </div>

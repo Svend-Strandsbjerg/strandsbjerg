@@ -20,7 +20,7 @@ function formatDate(value: Date | null) {
     return "-";
   }
 
-  return new Intl.DateTimeFormat("en-US", {
+  return new Intl.DateTimeFormat("da-DK", {
     year: "numeric",
     month: "short",
     day: "2-digit",
@@ -59,7 +59,7 @@ function DiscFigure({ x, y }: { x: number; y: number }) {
             "dark:border-slate-100 dark:bg-slate-50 dark:shadow-[0_0_0_3px_rgba(248,250,252,0.35)]",
           )}
           style={{ left: formatPercent(x), top: formatPercent(-y) }}
-          aria-label="DISC placement marker"
+          aria-label="DISC-placeringsmarkør"
         />
       </div>
     </div>
@@ -69,7 +69,7 @@ function DiscFigure({ x, y }: { x: number; y: number }) {
 function DiscWeighting({ scores }: { scores: Record<"D" | "I" | "S" | "C", number | null> }) {
   return (
     <div className="rounded-xl border border-border/60 bg-muted/20 p-3">
-      <h5 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Weighting</h5>
+      <h5 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Vægtning</h5>
       <ul className="mt-3 space-y-2 text-sm">
         <li className="flex items-center justify-between"><span className="text-muted-foreground">D</span><span className="font-semibold text-foreground">{formatDimensionValue(scores.D)}</span></li>
         <li className="flex items-center justify-between"><span className="text-muted-foreground">I</span><span className="font-semibold text-foreground">{formatDimensionValue(scores.I)}</span></li>
@@ -103,7 +103,7 @@ export function DiscResultPresentation({
     return (
       <div className="rounded-xl border border-border/70 bg-muted/20 p-4 text-sm">
         <p className="font-medium">{title}</p>
-        <p className="mt-1 text-muted-foreground">This assessment is {status.toLowerCase()} and does not have a completed result view yet.</p>
+        <p className="mt-1 text-muted-foreground">Denne besvarelse er {status.toLowerCase()} og har endnu ikke en færdig resultatvisning.</p>
       </div>
     );
   }
@@ -112,7 +112,7 @@ export function DiscResultPresentation({
     return (
       <div className="rounded-xl border border-border/70 bg-muted/20 p-4 text-sm">
         <p className="font-medium">{title}</p>
-        <p className="mt-1 text-muted-foreground">{emptyMessage ?? "Result data is incomplete. Please contact support if this persists."}</p>
+        <p className="mt-1 text-muted-foreground">{emptyMessage ?? "Resultatdata er ufuldstændige. Kontakt support hvis problemet fortsætter."}</p>
       </div>
     );
   }
@@ -124,13 +124,13 @@ export function DiscResultPresentation({
         <h3 className="mt-2 text-xl font-semibold tracking-tight">{profilePresentation.profileTitle}</h3>
         <p className="mt-1 text-sm font-medium text-foreground/90">{profilePresentation.profileLabel}</p>
         <p className="mt-2 text-sm text-muted-foreground">
-          {identityLabel ? `${identityLabel} · ` : ""}Generated on {formatDate(completionDate)}
+          {identityLabel ? `${identityLabel} · ` : ""}Genereret {formatDate(completionDate)}
         </p>
-        {companyLabel ? <p className="mt-1 text-xs text-muted-foreground/90">Shared by {companyLabel}</p> : null}
+        {companyLabel ? <p className="mt-1 text-xs text-muted-foreground/90">Delt af {companyLabel}</p> : null}
       </div>
 
       <section className="rounded-xl border border-border/70 p-4 sm:p-5">
-        <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">DISC figure</h4>
+        <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">DISC-figur</h4>
         <div className="mt-4 grid gap-5 lg:grid-cols-[13rem_minmax(0,1fr)] lg:items-center">
           <DiscWeighting scores={viewModel.dimensionScores} />
           <DiscFigure x={placement.x} y={placement.y} />
@@ -138,7 +138,7 @@ export function DiscResultPresentation({
       </section>
 
       <section className="rounded-xl border border-border/70 p-4">
-        <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Profile summary</h4>
+        <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Profilopsummering</h4>
         <p className="mt-3 text-sm leading-6 text-muted-foreground">{profilePresentation.summary}</p>
         {!isCompact ? <p className="mt-3 text-xs leading-5 text-muted-foreground">{profilePresentation.explanatoryNote}</p> : null}
       </section>
@@ -151,7 +151,7 @@ export function DiscResultPresentation({
             rel="noreferrer"
             className="inline-flex h-9 items-center rounded-md border border-input bg-background px-4 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
           >
-            Download PDF report
+            Hent PDF-rapport
           </a>
         </div>
       ) : null}

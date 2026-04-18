@@ -202,6 +202,20 @@ export async function getCompanyAreaMemberships(userId: string) {
               },
             },
           },
+          memberships: {
+            orderBy: { createdAt: "asc" },
+            select: {
+              userId: true,
+              role: true,
+              user: {
+                select: {
+                  name: true,
+                  email: true,
+                  discMaxTierOverride: true,
+                },
+              },
+            },
+          },
         },
       },
     },

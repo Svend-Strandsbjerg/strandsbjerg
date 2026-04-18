@@ -33,7 +33,7 @@ export default async function DiscOverviewPage({ searchParams }: DiscOverviewPag
     versionEntitlements = resolution.visibleEntitlements;
     autoSelectedAssessmentVersionId = resolution.autoSelectedAssessmentVersionId;
   } catch (error) {
-    versionDiscoveryError = error instanceof DiscEngineError ? error.message : "Unable to load DISC assessment versions right now.";
+    versionDiscoveryError = error instanceof DiscEngineError ? error.message : "Kunne ikke hente DISC-versioner lige nu.";
   }
 
   const totalAssessmentCountPromise = prisma.discAssessment.count({
