@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 
 import { signIn } from "@/lib/auth";
 import { persistDiscInviteContext } from "@/lib/disc-invite-context";
+import { persistDiscPromoTokenContext } from "@/lib/disc-promo-context";
+import { logServerEvent } from "@/lib/logger";
 import { hashPassword } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
 
@@ -25,7 +27,9 @@ export async function registerDiscUser(_: DiscSignupActionState, formData: FormD
   const name = String(formData.get("name") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const nextPath = String(formData.get("next") ?? "/disc/overview");
+  const safeNextPath = nextPath.startsWith("/") ? nextPath : "/disc/overview";
   const inviteToken = String(formData.get("invite") ?? "").trim();
+  const promoToken = String(formData.get("promo") ?? "").trim();
 
   if (!email || !email.includes("@")) {
     return { status: "error", message: "Indtast en gyldig e-mailadresse." };
@@ -59,14 +63,21 @@ export async function registerDiscUser(_: DiscSignupActionState, formData: FormD
     if (inviteToken) {
       await persistDiscInviteContext(inviteToken);
     }
+    if (promoToken) {
+      await persistDiscPromoTokenContext(promoToken);
+      logServerEvent("info", "disc_promo_auth_redirect_context_ready", {
+        promoToken,
+        flow: "signup_submit",
+      });
+    }
 
     await signIn("credentials", {
       email,
       password,
-      redirectTo: nextPath,
+      redirectTo: safeNextPath,
     });
 
-    redirect(nextPath);
+    redirect(safeNextPath as never);
   } catch {
     return {
       status: "error",

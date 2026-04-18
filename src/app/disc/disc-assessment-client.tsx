@@ -28,6 +28,8 @@ type DiscAssessmentClientProps = {
   versionDiscoveryError: string | null;
   hasCompanyDiscAccess: boolean;
   totalAssessmentCount: number;
+  remainingPromoCredits: number;
+  promoEntryState?: string | null;
   assessments: Array<{
     id: string;
     status: "STARTED" | "SUBMITTED" | "FAILED";
@@ -72,6 +74,8 @@ export function DiscAssessmentClient({
   versionDiscoveryError,
   hasCompanyDiscAccess,
   totalAssessmentCount,
+  remainingPromoCredits,
+  promoEntryState,
   assessments,
 }: DiscAssessmentClientProps) {
   const router = useRouter();
@@ -211,6 +215,14 @@ export function DiscAssessmentClient({
   const isReadyForSubmit = hasQuestions && answeredCount === questions.length;
   const isFinalOverviewVisible = hasEnteredFinalOverview && isReadyForSubmit;
   const canStartAssessment = selectedAssessmentVersionId.length > 0 && !versionDiscoveryError;
+  const promoStateCopy =
+    promoEntryState === "ready"
+      ? "Din kampagnekredit er klar. Vælg DISC-version og start testen."
+      : promoEntryState === "used"
+        ? "Din tidligere kampagnekredit er brugt. Du kan stadig se historik i dit DISC-overblik."
+        : promoEntryState === "redeemed"
+          ? "Din kampagne blev aktiveret. Du kan starte din DISC-test nu."
+          : null;
 
   useEffect(() => {
     if (!selectedAssessmentVersionId && selectableEntitlements.length === 1) {
@@ -260,6 +272,11 @@ export function DiscAssessmentClient({
               </Button>
             ) : null}
           </div>
+          {remainingPromoCredits > 0 ? (
+            <p className="mt-3 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
+              Du har {remainingPromoCredits} aktiv(e) kampagnekredit(ter). Kreditter bruges ved start af en DISC-session.
+            </p>
+          ) : null}
         </PageIntro>
 
         <SectionBlock
@@ -267,6 +284,11 @@ export function DiscAssessmentClient({
           subtitle="Start a new DISC session for your own use, submit your responses, and review your recent history."
         >
           <ContentContainer>
+            {promoStateCopy ? (
+              <div className="rounded-2xl border border-sky-200 bg-sky-50/80 p-4">
+                <p className="text-sm font-medium text-sky-900">{promoStateCopy}</p>
+              </div>
+            ) : null}
             {!hasStartedSession ? (
               <div className="flex flex-wrap gap-3">
                 <Button type="button" onClick={() => setIsStartModalOpen(true)} disabled={starting || selectableEntitlements.length === 0}>
@@ -288,6 +310,13 @@ export function DiscAssessmentClient({
             ) : null}
             {!hasStartedSession && selectableEntitlements.length === 0 ? (
               <p className="text-sm text-muted-foreground">Der er ingen DISC-assessments tilgængelige for denne konto lige nu.</p>
+            ) : null}
+            {!hasStartedSession ? (
+              <div className="rounded-xl border border-border/70 bg-muted/20 p-4 text-sm text-muted-foreground">
+                {remainingPromoCredits > 0
+                  ? `Du har ${remainingPromoCredits} gratis kampagnekredit(ter) klar. Kreditter bruges ved sessionstart.`
+                  : "Ingen aktive kampagnekreditter lige nu. Start stadig DISC med dine øvrige entitlements."}
+              </div>
             ) : null}
 
             {userId ? (

@@ -7,6 +7,7 @@ import { AssessmentInviteStatus, CompanyRole, DiscTierAccess } from "@prisma/cli
 import { requireUser } from "@/lib/access";
 import { canCreateCompanyProfile, canManageCompany } from "@/lib/company-access";
 import { type CompanyInviteActionState } from "@/app/disc/company/action-state";
+import { createUniqueDiscPromoToken } from "@/lib/disc-promo";
 import { sendDiscEmail } from "@/lib/disc-email";
 import { createUniqueAssessmentInviteToken, getInviteAccessState, isActiveInviteUniqueConstraintError } from "@/lib/disc-invites";
 import { logServerEvent } from "@/lib/logger";
@@ -41,6 +42,61 @@ function parseDiscTierAccess(value: string): DiscTierAccess | null {
   }
 
   return null;
+}
+
+export async function createDiscPromoLink(
+  _: CompanyInviteActionState,
+  formData: FormData,
+): Promise<CompanyInviteActionState> {
+  const user = await requireUser();
+  const companyId = String(formData.get("companyId") ?? "").trim();
+  const label = String(formData.get("label") ?? "").trim();
+  const expiresInDaysRaw = String(formData.get("expiresInDays") ?? "").trim();
+  const maxRedemptionsRaw = String(formData.get("maxRedemptions") ?? "").trim();
+
+  if (!companyId || !label) {
+    return { status: "error", message: "Company and label are required." };
+  }
+
+  try {
+    await requireCompanyAdmin(user.id, companyId);
+    const token = await createUniqueDiscPromoToken();
+    const expiresInDays = expiresInDaysRaw ? Number(expiresInDaysRaw) : null;
+    const maxRedemptions = maxRedemptionsRaw ? Number(maxRedemptionsRaw) : null;
+
+    const expiresAt =
+      expiresInDays && Number.isFinite(expiresInDays) && expiresInDays > 0
+        ? new Date(Date.now() + Math.min(expiresInDays, 365) * 24 * 60 * 60 * 1000)
+        : null;
+
+    await prisma.discPromoLink.create({
+      data: {
+        token,
+        label,
+        companyId,
+        createdByUserId: user.id,
+        grantTier: DiscTierAccess.FREE,
+        grantCredits: 1,
+        oneRedemptionPerUser: true,
+        maxRedemptions: maxRedemptions && Number.isFinite(maxRedemptions) && maxRedemptions > 0 ? Math.min(maxRedemptions, 500_000) : null,
+        expiresAt,
+      },
+    });
+
+    logServerEvent("info", "disc_promo_link_created", {
+      companyId,
+      userId: user.id,
+      label,
+      expiresAt: expiresAt?.toISOString() ?? null,
+      maxRedemptions: maxRedemptions ?? null,
+    });
+
+    revalidatePath("/disc/company");
+    return { status: "success", message: "Public DISC promo link created." };
+  } catch (error) {
+    logServerEvent("error", "disc_promo_link_create_failed", { companyId, userId: user.id, error });
+    return { status: "error", message: "Could not create public promo link." };
+  }
 }
 
 export async function createAssessmentInvite(

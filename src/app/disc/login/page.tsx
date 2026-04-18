@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 
 import { auth, signIn } from "@/lib/auth";
 import { persistDiscInviteContext } from "@/lib/disc-invite-context";
+import { persistDiscPromoTokenContext } from "@/lib/disc-promo-context";
+import { logServerEvent } from "@/lib/logger";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -26,15 +28,24 @@ export default async function DiscLoginPage({ searchParams }: DiscLoginPageProps
   const params = searchParams ? await searchParams : undefined;
   const session = await auth();
   const inviteToken = getSingleParam(params, "invite")?.trim();
+  const promoToken = getSingleParam(params, "promo")?.trim();
   const nextPath = getSingleParam(params, "next")?.trim() || "/disc/overview";
+  const safeNextPath = nextPath.startsWith("/") ? nextPath : "/disc/overview";
   const authErrorKey = getSingleParam(params, "error");
 
   if (inviteToken) {
     await persistDiscInviteContext(inviteToken);
   }
+  if (promoToken) {
+    await persistDiscPromoTokenContext(promoToken);
+    logServerEvent("info", "disc_promo_auth_redirect_context_ready", {
+      promoToken,
+      flow: "login_page",
+    });
+  }
 
   if (session?.user?.id) {
-    redirect(nextPath);
+    redirect(safeNextPath as never);
   }
 
   const credentialsSignIn = async (formData: FormData) => {
@@ -46,9 +57,17 @@ export default async function DiscLoginPage({ searchParams }: DiscLoginPageProps
     const password = String(formData.get("password") ?? "");
     const callbackTarget = String(formData.get("next") ?? "/disc/overview");
     const invite = String(formData.get("invite") ?? "").trim();
+    const promo = String(formData.get("promo") ?? "").trim();
 
     if (invite) {
       await persistDiscInviteContext(invite);
+    }
+    if (promo) {
+      await persistDiscPromoTokenContext(promo);
+      logServerEvent("info", "disc_promo_auth_redirect_context_ready", {
+        promoToken: promo,
+        flow: "login_submit",
+      });
     }
 
     if (!email || !password) {
@@ -78,14 +97,16 @@ export default async function DiscLoginPage({ searchParams }: DiscLoginPageProps
       </div>
 
       {inviteToken ? <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">Invitation registreret. Log ind for at fortsætte.</p> : null}
+      {promoToken ? <p className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-900">Promo-link registreret. Log ind for at redeem din gratis DISC.</p> : null}
 
       {authErrorKey && loginErrors[authErrorKey] ? (
         <p className="rounded-2xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{loginErrors[authErrorKey]}</p>
       ) : null}
 
       <form action={credentialsSignIn} className="space-y-3">
-        <input type="hidden" name="next" value={nextPath} />
+        <input type="hidden" name="next" value={safeNextPath} />
         <input type="hidden" name="invite" value={inviteToken ?? ""} />
+        <input type="hidden" name="promo" value={promoToken ?? ""} />
         <Input type="email" name="email" required placeholder="you@example.com" autoComplete="email" />
         <Input type="password" name="password" required placeholder="Password" autoComplete="current-password" />
         <Button className="w-full">Log ind</Button>
@@ -93,7 +114,10 @@ export default async function DiscLoginPage({ searchParams }: DiscLoginPageProps
 
       <p className="text-center text-xs text-muted-foreground">
         Har du ikke en konto?{" "}
-        <Link href={`/disc/signup?next=${encodeURIComponent(nextPath)}${inviteToken ? `&invite=${encodeURIComponent(inviteToken)}` : ""}`} className="underline-offset-4 hover:underline">
+        <Link
+          href={`/disc/signup?next=${encodeURIComponent(safeNextPath)}${inviteToken ? `&invite=${encodeURIComponent(inviteToken)}` : ""}${promoToken ? `&promo=${encodeURIComponent(promoToken)}` : ""}`}
+          className="underline-offset-4 hover:underline"
+        >
           Opret bruger
         </Link>
       </p>

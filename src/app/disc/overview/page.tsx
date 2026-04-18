@@ -9,7 +9,18 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-export default async function DiscOverviewPage() {
+type DiscOverviewPageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+function getSingleParam(params: Record<string, string | string[] | undefined> | undefined, key: string) {
+  const value = params?.[key];
+  return Array.isArray(value) ? value[0] : value;
+}
+
+export default async function DiscOverviewPage({ searchParams }: DiscOverviewPageProps) {
+  const params = searchParams ? await searchParams : undefined;
+  const promoEntryState = getSingleParam(params, "promo");
   const user = await requireUser();
   let versionEntitlements: DiscVersionEntitlement[] = [];
   let autoSelectedAssessmentVersionId: string | null = null;
@@ -27,6 +38,18 @@ export default async function DiscOverviewPage() {
 
   const totalAssessmentCountPromise = prisma.discAssessment.count({
     where: { userId: user.id },
+  });
+  const promoCreditsPromise = prisma.discPromoRedemption.aggregate({
+    where: {
+      userId: user.id,
+      promoLink: {
+        active: true,
+      },
+    },
+    _sum: {
+      grantedCredits: true,
+      consumedCredits: true,
+    },
   });
   const hasCompanyAreaAccess = await canAccessCompanyArea(user.id);
   const assessments = await prisma.discAssessment.findMany({
@@ -48,6 +71,8 @@ export default async function DiscOverviewPage() {
     },
   });
   const totalAssessmentCount = await totalAssessmentCountPromise;
+  const promoCredits = await promoCreditsPromise;
+  const remainingPromoCredits = Math.max(0, (promoCredits._sum.grantedCredits ?? 0) - (promoCredits._sum.consumedCredits ?? 0));
 
   const assessmentsWithShares = await Promise.all(
     assessments.map(async (assessment) => {
@@ -78,6 +103,8 @@ export default async function DiscOverviewPage() {
       assessments={assessmentsWithShares}
       totalAssessmentCount={totalAssessmentCount}
       hasCompanyDiscAccess={hasCompanyAreaAccess}
+      remainingPromoCredits={remainingPromoCredits}
+      promoEntryState={promoEntryState}
     />
   );
 }

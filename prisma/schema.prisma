@@ -78,6 +78,10 @@ enum DiscAssessmentStatus {
   FAILED
 }
 
+enum DiscPromoGrantType {
+  FREE_DISC_CREDIT
+}
+
 model User {
   id             String         @id @default(cuid())
   name           String?
@@ -98,6 +102,8 @@ model User {
   investmentTransactions InvestmentTransaction[] @relation("InvestmentTransactionCreator")
   loginActivities         LoginActivity[]
   discAssessments         DiscAssessment[]
+  discPromoLinks          DiscPromoLink[]          @relation("DiscPromoLinkCreator")
+  discPromoRedemptions    DiscPromoRedemption[]
   companyMemberships      CompanyMembership[]
   createdAssessmentInvites AssessmentInvite[] @relation("InviteCreator")
 
@@ -122,6 +128,7 @@ model Company {
 
   memberships CompanyMembership[]
   invites     AssessmentInvite[]
+  promoLinks  DiscPromoLink[]
   assessments DiscAssessment[]
 }
 
@@ -164,6 +171,7 @@ model DiscAssessment {
   assessmentVersionId String
   userId              String?
   inviteId            String?
+  promoRedemptionId   String?
   companyId           String?
   candidateName       String?
   candidateEmail      String?
@@ -175,11 +183,55 @@ model DiscAssessment {
   user        User?                  @relation(fields: [userId], references: [id], onDelete: SetNull)
   resultShare AssessmentResultShare?
   invite  AssessmentInvite? @relation(fields: [inviteId], references: [id], onDelete: SetNull)
+  promoRedemption DiscPromoRedemption? @relation(fields: [promoRedemptionId], references: [id], onDelete: SetNull)
   company Company?          @relation(fields: [companyId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt])
   @@index([companyId, createdAt])
   @@index([inviteId])
+  @@index([promoRedemptionId])
+}
+
+model DiscPromoLink {
+  id                       String             @id @default(cuid())
+  token                    String             @unique
+  label                    String
+  createdByUserId          String
+  companyId                String?
+  grantType                DiscPromoGrantType @default(FREE_DISC_CREDIT)
+  grantTier                DiscTierAccess     @default(FREE)
+  grantCredits             Int                @default(1)
+  active                   Boolean            @default(true)
+  oneRedemptionPerUser     Boolean            @default(true)
+  maxRedemptions           Int?
+  expiresAt                DateTime?
+  totalRedemptions         Int                @default(0)
+  createdAt                DateTime           @default(now())
+  updatedAt                DateTime           @updatedAt
+
+  createdByUser User                @relation("DiscPromoLinkCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  company      Company?             @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  redemptions  DiscPromoRedemption[]
+
+  @@index([companyId, active])
+  @@index([expiresAt])
+}
+
+model DiscPromoRedemption {
+  id            String   @id @default(cuid())
+  promoLinkId   String
+  userId        String
+  grantedCredits Int     @default(1)
+  consumedCredits Int    @default(0)
+  redeemedAt    DateTime @default(now())
+  lastUsedAt    DateTime?
+
+  promoLink    DiscPromoLink   @relation(fields: [promoLinkId], references: [id], onDelete: Cascade)
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assessments  DiscAssessment[]
+
+  @@index([promoLinkId, userId])
+  @@index([userId, redeemedAt])
 }
 
 

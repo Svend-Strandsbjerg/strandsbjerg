@@ -5,6 +5,7 @@ import type { CompanyRole } from "@prisma/client";
 
 import {
   createAssessmentInvite,
+  createDiscPromoLink,
   invalidateAssessmentInvite,
   resendAssessmentInviteEmail,
   resendAssessmentResultEmail,
@@ -14,6 +15,7 @@ import { initialCompanyInviteActionState } from "@/app/disc/company/action-state
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { deriveInviteLifecycleStatus, toInviteStatusLabel, type InviteLifecycleStatus } from "@/lib/disc-invite-status";
+import { buildDiscPromoShareText } from "@/lib/disc-promo-share";
 import { cn } from "@/lib/utils";
 
 type CompanyDiscAdminProps = {
@@ -48,6 +50,20 @@ type CompanyDiscAdminProps = {
           token: string;
         } | null;
       }>;
+    }>;
+    promoLinks: Array<{
+      id: string;
+      token: string;
+      label: string;
+      active: boolean;
+      grantType: "FREE_DISC_CREDIT";
+      grantTier: "FREE" | "STANDARD" | "DEEP";
+      grantCredits: number;
+      oneRedemptionPerUser: boolean;
+      maxRedemptions: number | null;
+      totalRedemptions: number;
+      expiresAt: Date | null;
+      createdAt: Date;
     }>;
     assessments: Array<{
       id: string;
@@ -104,6 +120,29 @@ function CopyLinkButton({ link }: { link: string }) {
   );
 }
 
+function CopyShareTextButton({ text }: { text: string }) {
+  const [copyState, setCopyState] = useState<"idle" | "success" | "error">("idle");
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      className="h-8 text-xs"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+          setCopyState("success");
+        } catch {
+          setCopyState("error");
+        }
+        setTimeout(() => setCopyState("idle"), 2200);
+      }}
+    >
+      {copyState === "success" ? "Tekst kopieret ✓" : copyState === "error" ? "Kunne ikke kopiere" : "Kopiér delingstekst"}
+    </Button>
+  );
+}
+
 function statusTone(status: InviteLifecycleStatus) {
   switch (status) {
     case "completed":
@@ -127,6 +166,7 @@ function canManageCompany(role: CompanyRole) {
 export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
   const [createState, createAction] = useActionState(createAssessmentInvite, initialCompanyInviteActionState);
   const [invalidateState, invalidateAction] = useActionState(invalidateAssessmentInvite, initialCompanyInviteActionState);
+  const [promoCreateState, promoCreateAction] = useActionState(createDiscPromoLink, initialCompanyInviteActionState);
   const [resendInviteState, resendInviteAction] = useActionState(resendAssessmentInviteEmail, initialCompanyInviteActionState);
   const [resendState, resendAction] = useActionState(resendAssessmentResultEmail, initialCompanyInviteActionState);
   const [tierAccessState, tierAccessAction] = useActionState(updateCompanyDiscTierAccess, initialCompanyInviteActionState);
@@ -148,9 +188,12 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
     if (invalidateState.status !== "idle") {
       return invalidateState;
     }
+    if (promoCreateState.status !== "idle") {
+      return promoCreateState;
+    }
 
     return createState;
-  }, [createState, invalidateState, resendInviteState, resendState, tierAccessState]);
+  }, [createState, invalidateState, promoCreateState, resendInviteState, resendState, tierAccessState]);
 
   return (
     <div className="space-y-6">
@@ -264,6 +307,68 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
                 Du har læseadgang som Company Viewer. Kun Company Admin kan oprette invitationer eller ændre virksomhedsdata.
               </div>
             )}
+
+            <div className="mt-5 rounded-2xl border border-border/80 bg-muted/20 p-4">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">Public DISC signup links</h3>
+              <p className="mt-2 text-sm text-muted-foreground">Opret delbare kampagne-links, hvor brugere kan oprette konto og få én gratis DISC-kredit.</p>
+
+              {canManageCompany(company.membershipRole) ? (
+                <form action={promoCreateAction} className="mt-3 grid gap-3 md:grid-cols-4">
+                  <input type="hidden" name="companyId" value={company.id} />
+                  <Input name="label" required placeholder="Kampagnenavn (fx LinkedIn April)" />
+                  <Input name="expiresInDays" type="number" min={1} max={365} placeholder="Udløber om dage (valgfrit)" />
+                  <Input name="maxRedemptions" type="number" min={1} max={500000} placeholder="Maks redemptions (valgfrit)" />
+                  <div className="md:col-span-1 flex items-end">
+                    <Button type="submit" className="w-full">
+                      Opret public link
+                    </Button>
+                  </div>
+                </form>
+              ) : null}
+
+              {company.promoLinks.length === 0 ? (
+                <p className="mt-3 text-xs text-muted-foreground">Ingen public promo-links endnu.</p>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {company.promoLinks.map((promoLink) => {
+                    const promoUrl = `${origin}/disc/promo/${promoLink.token}`;
+                    const shareText = buildDiscPromoShareText({
+                      campaignLabel: promoLink.label,
+                      promoUrl,
+                      creditCount: promoLink.grantCredits,
+                    });
+                    return (
+                      <div key={promoLink.id} className="space-y-2 rounded-xl border border-border/70 bg-background p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium">{promoLink.label}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Tier {promoLink.grantTier} · Credits {promoLink.grantCredits} · Redemptions {promoLink.totalRedemptions}
+                              {promoLink.maxRedemptions ? `/${promoLink.maxRedemptions}` : ""}
+                            </p>
+                          </div>
+                          <span className={cn("inline-flex rounded-full border px-2 py-0.5 text-xs font-medium", promoStatusTone(promoLink))}>
+                            {promoStatusLabel(promoLink)}
+                          </span>
+                        </div>
+
+                        <div className="rounded-md border border-border/70 bg-muted/20 px-2 py-1 text-[11px] text-muted-foreground">
+                          Delingstekst preview: {shareText}
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          <CopyLinkButton link={promoUrl} />
+                          <CopyShareTextButton text={shareText} />
+                          <a href={promoUrl} className="inline-flex h-8 items-center justify-center rounded-full border border-border bg-card px-3 text-xs font-medium hover:bg-muted">
+                            Åbn link
+                          </a>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
             {showFirstInviteSuccess && latestInvite ? (
               <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
@@ -414,4 +519,30 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
       })}
     </div>
   );
+}
+function promoStatusTone(promo: { active: boolean; expiresAt: Date | null; maxRedemptions: number | null; totalRedemptions: number }) {
+  const exhausted = promo.maxRedemptions !== null && promo.totalRedemptions >= promo.maxRedemptions;
+  const expired = promo.expiresAt ? promo.expiresAt.getTime() <= Date.now() : false;
+
+  if (!promo.active || expired || exhausted) {
+    return "border-border bg-muted text-muted-foreground";
+  }
+
+  return "border-emerald-300 bg-emerald-100 text-emerald-900";
+}
+
+function promoStatusLabel(promo: { active: boolean; expiresAt: Date | null; maxRedemptions: number | null; totalRedemptions: number }) {
+  if (!promo.active) {
+    return "Inaktiv";
+  }
+
+  if (promo.expiresAt && promo.expiresAt.getTime() <= Date.now()) {
+    return "Udløbet";
+  }
+
+  if (promo.maxRedemptions !== null && promo.totalRedemptions >= promo.maxRedemptions) {
+    return "Fuldt indløst";
+  }
+
+  return "Aktiv";
 }

@@ -16,7 +16,9 @@ import {
   validateDiscResponses,
 } from "@/lib/disc-engine";
 import { extractCanonicalResult } from "@/lib/disc-result-insights";
-import { assertSelectableVersion, getPersonalDiscVersionEntitlements } from "@/lib/disc-version-entitlements";
+import { canPromoGrantTierAccess } from "@/lib/disc-promo";
+import { clearDiscPromoRedemptionContext, readDiscPromoRedemptionContext } from "@/lib/disc-promo-context";
+import { assertSelectableVersion, getPersonalDiscVersionEntitlements, inferDiscVersionCategory } from "@/lib/disc-version-entitlements";
 import { logServerEvent } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import { enforceRateLimit } from "@/lib/rate-limit";
@@ -34,9 +36,11 @@ function toErrorMessage(error: unknown, fallback: string) {
 
 export async function startDiscAssessment(_: DiscFlowState, formData: FormData): Promise<DiscFlowState> {
   const session = await auth();
+  const sessionUserId = session?.user?.id ?? null;
   const userId = session?.user?.id ?? "anonymous";
   const cookieStore = await cookies();
   const selectedAssessmentVersionId = String(formData.get("assessmentVersionId") ?? "").trim();
+  const promoRedemptionId = await readDiscPromoRedemptionContext();
   const existingSessionId = cookieStore.get(DISC_SESSION_COOKIE)?.value;
   const submittedSessionId = cookieStore.get(DISC_SUBMITTED_COOKIE)?.value;
 
@@ -110,6 +114,58 @@ export async function startDiscAssessment(_: DiscFlowState, formData: FormData):
     };
   }
 
+  if (promoRedemptionId) {
+    logServerEvent("info", "disc_promo_start_attempt", {
+      userId,
+      promoRedemptionId,
+      assessmentVersionId: selectedAssessmentVersionId,
+    });
+
+    const versionCategory = inferDiscVersionCategory(entitlement.version);
+    const promoRedemption = await prisma.discPromoRedemption.findUnique({
+      where: { id: promoRedemptionId },
+      select: {
+        id: true,
+        userId: true,
+        grantedCredits: true,
+        consumedCredits: true,
+        promoLink: {
+          select: {
+            id: true,
+            grantTier: true,
+            active: true,
+            expiresAt: true,
+          },
+        },
+      },
+    });
+
+    if (!promoRedemption || promoRedemption.userId !== session?.user?.id) {
+      await clearDiscPromoRedemptionContext();
+    } else {
+      const availableCredits = promoRedemption.grantedCredits - promoRedemption.consumedCredits;
+      const promoLinkExpired = Boolean(promoRedemption.promoLink.expiresAt && promoRedemption.promoLink.expiresAt.getTime() <= Date.now());
+      if (!promoRedemption.promoLink.active || promoLinkExpired || availableCredits <= 0) {
+        await clearDiscPromoRedemptionContext();
+        return {
+          status: "error",
+          message: "Din kampagnekredit er ikke længere gyldig. Åbn et nyt promo-link for at få adgang.",
+          sessionId: "",
+          questions: [],
+        };
+      }
+
+      if (!canPromoGrantTierAccess(promoRedemption.promoLink.grantTier, versionCategory)) {
+        return {
+          status: "error",
+          message: "Denne DISC-version er ikke inkluderet i kampagnens gratis adgang.",
+          sessionId: "",
+          questions: [],
+        };
+      }
+    }
+  }
+
   if (existingSessionId && existingSessionId !== submittedSessionId) {
     try {
       const matchingSessionAssessment = await prisma.discAssessment.findUnique({
@@ -166,10 +222,52 @@ export async function startDiscAssessment(_: DiscFlowState, formData: FormData):
       initiatedByUserId: session?.user?.id ?? null,
     });
     const questions = await getDiscSessionQuestions(createdSession.sessionId);
+    let consumedPromoRedemptionId: string | null = null;
+    if (promoRedemptionId && sessionUserId) {
+      const consumed = await prisma.$transaction(async (tx) => {
+        const redemption = await tx.discPromoRedemption.findUnique({
+          where: { id: promoRedemptionId },
+          select: { userId: true, consumedCredits: true, grantedCredits: true },
+        });
+
+        if (!redemption || redemption.userId !== sessionUserId || redemption.consumedCredits >= redemption.grantedCredits) {
+          return false;
+        }
+
+        await tx.discPromoRedemption.update({
+          where: { id: promoRedemptionId },
+          data: {
+            consumedCredits: { increment: 1 },
+            lastUsedAt: new Date(),
+          },
+        });
+        return true;
+      });
+
+      if (!consumed) {
+        await clearDiscPromoRedemptionContext();
+        return {
+          status: "error",
+          message: "Din kampagnekredit kunne ikke bruges. Prøv at åbne promo-linket igen.",
+          sessionId: "",
+          questions: [],
+        };
+      }
+
+      consumedPromoRedemptionId = promoRedemptionId;
+      logServerEvent("info", "disc_promo_credit_consumed_on_start", {
+        userId: sessionUserId,
+        promoRedemptionId,
+        assessmentVersionId: selectedAssessmentVersionId,
+        sessionId: createdSession.sessionId,
+      });
+    }
+
     await createDiscAssessmentRecord({
       externalSessionId: createdSession.sessionId,
       assessmentVersionId: selectedAssessmentVersionId,
-      userId: session?.user?.id ?? null,
+      userId: sessionUserId,
+      promoRedemptionId: consumedPromoRedemptionId,
     });
 
     cookieStore.set(DISC_SESSION_COOKIE, createdSession.sessionId, {
@@ -186,6 +284,14 @@ export async function startDiscAssessment(_: DiscFlowState, formData: FormData):
       sessionId: createdSession.sessionId,
       assessmentVersionId: selectedAssessmentVersionId,
     });
+    if (consumedPromoRedemptionId) {
+      logServerEvent("info", "disc_promo_start_session_created", {
+        userId,
+        promoRedemptionId: consumedPromoRedemptionId,
+        sessionId: createdSession.sessionId,
+        assessmentVersionId: selectedAssessmentVersionId,
+      });
+    }
 
     return {
       status: "success",
