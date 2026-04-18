@@ -7,6 +7,7 @@ import { logServerEvent } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import type {
   DiscAssessmentVersion,
+  DiscReportTier,
   DiscTierAccessLevel,
   DiscVersionCategory,
   DiscVersionEntitlement,
@@ -63,6 +64,32 @@ export function inferDiscVersionCategory(version: DiscAssessmentVersion): DiscVe
     return "deep";
   }
   return "unknown";
+}
+
+export function resolveDiscReportTierFromCategory(category: DiscVersionCategory): DiscReportTier {
+  if (category === "standard" || category === "deep") {
+    return category;
+  }
+
+  return "free";
+}
+
+export function resolveDiscReportTierFromVersion(version: DiscAssessmentVersion | null | undefined): DiscReportTier {
+  if (!version) {
+    return "free";
+  }
+
+  return resolveDiscReportTierFromCategory(inferDiscVersionCategory(version));
+}
+
+export function resolveDiscReportTierForAssessmentVersionId(versions: DiscAssessmentVersion[], assessmentVersionId: string): DiscReportTier {
+  const matchingVersion = versions.find((version) => version.id === assessmentVersionId);
+  return resolveDiscReportTierFromVersion(matchingVersion);
+}
+
+export async function getDiscReportTierForAssessmentVersionId(assessmentVersionId: string): Promise<DiscReportTier> {
+  const discoveredVersions = await getDiscAssessmentVersions();
+  return resolveDiscReportTierForAssessmentVersionId(discoveredVersions, assessmentVersionId);
 }
 
 function toTierLevel(tier: DiscTierAccess | null): DiscTierAccessLevel | null {

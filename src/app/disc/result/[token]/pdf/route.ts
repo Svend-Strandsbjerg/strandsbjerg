@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getSharedDiscResultAccess } from "@/lib/disc-result-access";
 import { createDiscResultPdf } from "@/lib/disc-result-pdf";
+import { getDiscReportTierForAssessmentVersionId } from "@/lib/disc-version-entitlements";
 import { logServerEvent } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 
@@ -38,7 +39,8 @@ export async function GET(_: Request, context: { params: Promise<{ token: string
       });
     }
 
-    const { pdfBytes } = createDiscResultPdf(access.sharedResult);
+    const reportTier = await getDiscReportTierForAssessmentVersionId(access.sharedResult.assessment.assessmentVersionId);
+    const { pdfBytes } = createDiscResultPdf(access.sharedResult, { reportTier });
 
     return new NextResponse(pdfBytes, {
       status: 200,
