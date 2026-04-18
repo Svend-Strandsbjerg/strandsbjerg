@@ -245,7 +245,7 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
-export function deriveDiscPlacement(dimensionScores: Record<DiscDimension, number | null>): DiscPlacement {
+export function calculateDiscPosition(dimensionScores: Record<DiscDimension, number | null>): DiscPlacement {
   const D = dimensionScores.D ?? 0;
   const I = dimensionScores.I ?? 0;
   const S = dimensionScores.S ?? 0;
@@ -276,3 +276,6 @@ export function deriveDiscPlacement(dimensionScores: Record<DiscDimension, numbe
     quadrant,
   };
 }
+
+
+export const deriveDiscPlacement = calculateDiscPosition;

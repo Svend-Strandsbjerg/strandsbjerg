@@ -1,4 +1,4 @@
-import { buildDiscProfileSummary, buildDiscResultViewModel, deriveDiscPlacement } from "@/lib/disc-result-insights";
+import { buildDiscProfileSummary, buildDiscResultViewModel, calculateDiscPosition } from "@/lib/disc-result-insights";
 import { cn } from "@/lib/utils";
 
 type DiscResultPresentationProps = {
@@ -81,7 +81,7 @@ export function DiscResultPresentation({
 }: DiscResultPresentationProps) {
   const viewModel = buildDiscResultViewModel(rawResponses);
   const profileSummary = buildDiscProfileSummary(viewModel);
-  const placement = deriveDiscPlacement(viewModel.dimensionScores);
+  const placement = calculateDiscPosition(viewModel.dimensionScores);
   const completionDate = submittedAt ?? (status === "SUBMITTED" ? createdAt : null);
 
   if (status !== "SUBMITTED") {
