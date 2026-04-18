@@ -79,6 +79,14 @@ export default async function CandidateResultPage({ params }: CandidateResultPag
             Åbn delt resultatlink
           </Link>
         ) : null}
+        {assessment.status === "SUBMITTED" && assessment.companyId ? (
+          <Link
+            href={`/disc/company/compare?companyId=${encodeURIComponent(assessment.companyId)}&assessmentIds=${encodeURIComponent(assessment.id)}`}
+            className="inline-flex h-9 items-center rounded-md border border-input bg-background px-4 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+          >
+            Add to comparison
+          </Link>
+        ) : null}
       </div>
     </div>
   );

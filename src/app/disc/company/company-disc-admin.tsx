@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useMemo, useState } from "react";
 import type { CompanyRole } from "@prisma/client";
 
@@ -260,6 +261,12 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
                 <h2 className="text-xl font-semibold tracking-tight">{company.name}</h2>
                 <p className="mt-1 text-sm text-muted-foreground">Rolle: {company.membershipRole === "COMPANY_ADMIN" ? "Company admin" : "Company viewer"} · Plan: {company.planTier} · Licens: {company.licenseStatus}</p>
               </div>
+              <Link
+                href={`/disc/company/compare?companyId=${encodeURIComponent(company.id)}`}
+                className="inline-flex h-9 items-center rounded-md border border-input bg-background px-4 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+              >
+                Open comparison
+              </Link>
             </div>
 
             <div className="mt-4 rounded-xl border border-border/80 bg-muted/20 p-4">
@@ -469,6 +476,14 @@ export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
                                           rel="noreferrer"
                                         >
                                           Åbn resultat
+                                        </a>
+                                      ) : null}
+                                      {row.latestAssessment ? (
+                                        <a
+                                          href={`/disc/company/compare?companyId=${encodeURIComponent(company.id)}&assessmentIds=${encodeURIComponent(row.latestAssessment.id)}`}
+                                          className="inline-flex h-8 items-center justify-center rounded-full border border-border bg-card px-3 text-xs font-medium hover:bg-muted"
+                                        >
+                                          Sammenlign
                                         </a>
                                       ) : null}
 
