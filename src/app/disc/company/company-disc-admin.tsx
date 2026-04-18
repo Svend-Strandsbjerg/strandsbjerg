@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useMemo, useState } from "react";
+import type { CompanyRole } from "@prisma/client";
 
 import {
   createAssessmentInvite,
@@ -18,7 +19,7 @@ type CompanyDiscAdminProps = {
   companies: Array<{
     id: string;
     name: string;
-    membershipRole: "COMPANY_ADMIN" | "COMPANY_VIEWER";
+    membershipRole: CompanyRole;
     status: "ACTIVE" | "INACTIVE";
     licenseStatus: "ACTIVE" | "TRIAL" | "INACTIVE" | "EXPIRED";
     planTier: "FREE" | "STANDARD" | "ENTERPRISE";
@@ -118,7 +119,7 @@ function statusTone(status: InviteLifecycleStatus) {
 }
 
 
-function canManageCompany(role: "COMPANY_ADMIN" | "COMPANY_VIEWER") {
+function canManageCompany(role: CompanyRole) {
   return role === "COMPANY_ADMIN";
 }
 export function CompanyDiscAdmin({ companies, origin }: CompanyDiscAdminProps) {
