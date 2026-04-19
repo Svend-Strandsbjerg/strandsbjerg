@@ -53,6 +53,17 @@ function normalizeVersionText(version: DiscAssessmentVersion) {
 }
 
 export function inferDiscVersionCategory(version: DiscAssessmentVersion): DiscVersionCategory {
+  const normalizedTier = version.tier?.toLowerCase().trim();
+  if (normalizedTier === "free") {
+    return "free";
+  }
+  if (normalizedTier === "standard") {
+    return "standard";
+  }
+  if (normalizedTier === "deep") {
+    return "deep";
+  }
+
   const text = normalizeVersionText(version);
   if (text.includes("free") || text.includes("gratis")) {
     return "free";
@@ -110,8 +121,17 @@ export function resolveDiscReportTierForAssessmentVersionId(versions: DiscAssess
 }
 
 export async function getDiscReportTierForAssessmentVersionId(assessmentVersionId: string): Promise<DiscReportTier> {
-  const discoveredVersions = await getDiscAssessmentVersions();
-  return resolveDiscReportTierForAssessmentVersionId(discoveredVersions, assessmentVersionId);
+  try {
+    const discoveredVersions = await getDiscAssessmentVersions();
+    return resolveDiscReportTierForAssessmentVersionId(discoveredVersions, assessmentVersionId);
+  } catch (error) {
+    logServerEvent("warn", "disc_report_tier_discovery_failed", {
+      assessmentVersionId,
+      fallbackTier: "free",
+      error,
+    });
+    return "free";
+  }
 }
 
 function toTierLevel(tier: DiscTierAccess | null): DiscTierAccessLevel | null {
@@ -367,8 +387,20 @@ function logEntitlementSummary(context: DiscVersionEntitlementContext, resolutio
 }
 
 export async function getPersonalDiscVersionEntitlements(input: { user: Pick<User, "id" | "role"> }): Promise<DiscVersionEntitlementResolution> {
-  const [discoveredVersions, accessInputs] = await Promise.all([getDiscAssessmentVersions(), resolveAccessInputs({ flow: "personal", user: input.user })]);
+  const accessInputs = await resolveAccessInputs({ flow: "personal", user: input.user });
   const policy = resolveEffectivePolicy({ flow: "personal", user: input.user }, accessInputs);
+  let discoveredVersions: DiscAssessmentVersion[] = [];
+
+  try {
+    discoveredVersions = await getDiscAssessmentVersions();
+  } catch (error) {
+    logServerEvent("warn", "disc_personal_entitlements_discovery_failed", {
+      userId: input.user.id,
+      fallback: "empty_entitlements",
+      error,
+    });
+  }
+
   const resolution = resolveDiscVersionEntitlements({
     flow: "personal",
     user: input.user,
