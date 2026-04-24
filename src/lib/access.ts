@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { canAccessAdminFromSubject, canAccessDiscAdminFromSubject, canAccessFamilyFromSubject, canAccessInvestmentsFromSubject } from "@/lib/access-rules";
 import { auth } from "@/lib/auth";
+import { logServerEvent } from "@/lib/logger";
 import {
   EDIT_ACCESS_COOKIE,
   EDIT_SECRET_HEADER,
@@ -117,8 +118,16 @@ export async function requireAdmin(searchParams?: SearchParams) {
 
 export async function requireDiscAdmin() {
   const user = await requireUser();
+  const allowed = canAccessDiscAdmin(user);
 
-  if (!canAccessDiscAdmin(user)) {
+  logServerEvent("info", "disc_admin_access_guard_checked", {
+    userId: user.id,
+    isAdmin: user.role === "ADMIN",
+    isDiscAdmin: Boolean(user.isDiscAdmin),
+    allowed,
+  });
+
+  if (!allowed) {
     redirect("/");
   }
 

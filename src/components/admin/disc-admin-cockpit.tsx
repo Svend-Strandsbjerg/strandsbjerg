@@ -59,9 +59,17 @@ export function DiscAdminCockpit({ query, status, users, companies, diagnostics,
             <p>Produktlinje: <span className="font-medium">{diagnostics.productLine ?? "ukendt"}</span></p>
             <p>Konfigureret sti: <span className="font-mono text-xs">{diagnostics.configuredPath}</span></p>
             <p>Antal versioner: <span className="font-medium">{diagnostics.versionCount}</span></p>
-            {diagnostics.versionCount === 0 ? <p className="text-amber-700">Ingen DISC-versioner er konfigureret i motoren.</p> : null}
+            {diagnostics.versionCount === 0 ? (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-900">
+                <p className="font-medium">DISC-motoren returnerer ingen versioner (versions: []).</p>
+                <p className="mt-1">
+                  Dette er en engine-konfiguration/seed-fejl, ikke en frontend entitlement-fejl. Motoren skal mindst eksponere den gratis
+                  16-spørgsmålsversion, før tests kan startes.
+                </p>
+              </div>
+            ) : null}
             {diagnostics.versionCount > 0 && !hasFreeVersion ? (
-              <p className="text-amber-700">Advarsel: Ingen version med tier “free” blev fundet.</p>
+              <p className="text-amber-700">Advarsel: Ingen version med tier “free” blev fundet. Motoren skal eksponere den gratis 16-spørgsmålsversion.</p>
             ) : null}
             {diagnostics.versions.length > 0 ? (
               <div className="overflow-x-auto">
