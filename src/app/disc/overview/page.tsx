@@ -1,7 +1,6 @@
 import { DiscAssessmentClient } from "@/app/disc/disc-assessment-client";
 import { requireUser } from "@/lib/access";
 import { ensureAssessmentResultShare } from "@/lib/disc-result-share";
-import { DiscEngineError } from "@/lib/disc-engine";
 import { getPersonalDiscVersionEntitlements } from "@/lib/disc-version-entitlements";
 import type { DiscVersionEntitlement } from "@/lib/disc-types";
 import { canAccessCompanyArea } from "@/lib/company-access";
@@ -24,17 +23,12 @@ export default async function DiscOverviewPage({ searchParams }: DiscOverviewPag
   const user = await requireUser();
   let versionEntitlements: DiscVersionEntitlement[] = [];
   let autoSelectedAssessmentVersionId: string | null = null;
-  let versionDiscoveryError: string | null = null;
-
-  try {
-    const resolution = await getPersonalDiscVersionEntitlements({
-      user: { id: user.id, role: user.role ?? "USER" },
-    });
-    versionEntitlements = resolution.visibleEntitlements;
-    autoSelectedAssessmentVersionId = resolution.autoSelectedAssessmentVersionId;
-  } catch (error) {
-    versionDiscoveryError = error instanceof DiscEngineError ? error.message : "Kunne ikke hente DISC-versioner lige nu.";
-  }
+  const resolution = await getPersonalDiscVersionEntitlements({
+    user: { id: user.id, role: user.role ?? "USER" },
+  });
+  versionEntitlements = resolution.visibleEntitlements;
+  autoSelectedAssessmentVersionId = resolution.autoSelectedAssessmentVersionId;
+  const versionDiscoveryError = versionEntitlements.length === 0 ? "Kunne ikke hente DISC-versioner lige nu." : null;
 
   const totalAssessmentCountPromise = prisma.discAssessment.count({
     where: { userId: user.id },

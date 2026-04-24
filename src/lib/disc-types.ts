@@ -22,6 +22,8 @@ export type DiscAssessmentVersion = {
   intendedUse: string | null;
   expectedQuestionCount: number | null;
   estimatedDurationMinutes: number | null;
+  tier: string | null;
+  deliveryMode: string | null;
   isDefault: boolean;
 };
 

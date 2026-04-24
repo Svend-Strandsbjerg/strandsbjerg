@@ -39,18 +39,7 @@ export async function GET(_: Request, context: { params: Promise<{ token: string
       });
     }
 
-    let reportTier: "free" | "standard" | "deep" = "free";
-    try {
-      reportTier = await getDiscReportTierForAssessmentVersionId(access.sharedResult.assessment.assessmentVersionId);
-    } catch (error) {
-      logServerEvent("warn", "disc_result_pdf_report_tier_fallback_used", {
-        resultToken: token,
-        assessmentId: access.sharedResult.assessmentId,
-        assessmentVersionId: access.sharedResult.assessment.assessmentVersionId,
-        fallbackTier: "free",
-        error,
-      });
-    }
+    const reportTier = await getDiscReportTierForAssessmentVersionId(access.sharedResult.assessment.assessmentVersionId);
 
     const { pdfBytes } = createDiscResultPdf(access.sharedResult, { reportTier });
 
