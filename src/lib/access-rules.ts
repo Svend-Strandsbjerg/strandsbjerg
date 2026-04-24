@@ -25,5 +25,7 @@ export function canAccessAdminFromSubject(subject?: AccessSubject | null) {
 }
 
 export function canAccessDiscAdminFromSubject(subject?: AccessSubject | null) {
-  return Boolean(isApproved(subject) && subject?.isDiscAdmin);
+  // Rule: general admins are considered superior for DISC admin cockpit access.
+  // Dedicated DISC admins (isDiscAdmin=true) can also access the same cockpit.
+  return Boolean(isApproved(subject) && (subject?.role === "ADMIN" || subject?.isDiscAdmin));
 }

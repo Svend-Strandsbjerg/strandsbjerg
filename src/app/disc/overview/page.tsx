@@ -30,7 +30,7 @@ export default async function DiscOverviewPage({ searchParams }: DiscOverviewPag
   autoSelectedAssessmentVersionId = resolution.autoSelectedAssessmentVersionId;
   const versionDiscoveryMessage =
     resolution.discoveryState === "empty"
-      ? "DISC-tests er midlertidigt ikke tilgængelige, fordi der ikke er konfigureret nogen assessment-versioner."
+      ? "DISC-tests er midlertidigt ikke tilgængelige, fordi DISC-motoren returnerer 0 assessment-versioner fra /products/disc/versions. Dette er en engine-konfiguration/seed-fejl (ikke en frontend-adgangsfejl)."
       : resolution.discoveryState === "failed"
         ? "DISC-versioner kunne ikke hentes lige nu. Prøv igen om lidt."
         : null;
