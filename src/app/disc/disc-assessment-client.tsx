@@ -25,7 +25,7 @@ type DiscAssessmentClientProps = {
   userId: string | null;
   versionEntitlements: DiscVersionEntitlement[];
   autoSelectedAssessmentVersionId: string | null;
-  versionDiscoveryError: string | null;
+  versionDiscoveryMessage: string | null;
   hasCompanyDiscAccess: boolean;
   totalAssessmentCount: number;
   remainingPromoCredits: number;
@@ -71,7 +71,7 @@ export function DiscAssessmentClient({
   userId,
   versionEntitlements,
   autoSelectedAssessmentVersionId,
-  versionDiscoveryError,
+  versionDiscoveryMessage,
   hasCompanyDiscAccess,
   totalAssessmentCount,
   remainingPromoCredits,
@@ -218,7 +218,7 @@ export function DiscAssessmentClient({
   const answeredCount = questions.filter((question) => Boolean(selectedOptionIdByQuestionId[question.id])).length;
   const isReadyForSubmit = hasQuestions && answeredCount === questions.length;
   const isFinalOverviewVisible = hasEnteredFinalOverview && isReadyForSubmit;
-  const canStartAssessment = selectedAssessmentVersionId.length > 0 && !versionDiscoveryError;
+  const canStartAssessment = selectedAssessmentVersionId.length > 0 && !versionDiscoveryMessage;
   const promoStateCopy =
     promoEntryState === "ready"
       ? "Ekstra adgang er aktiveret. Vælg DISC-version og start testen."
@@ -304,11 +304,15 @@ export function DiscAssessmentClient({
               <p className={submitState.status === "error" ? "text-sm text-destructive" : "text-sm text-emerald-700"}>{submitState.message}</p>
             ) : null}
 
+            {versionDiscoveryMessage ? (
+              <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">{versionDiscoveryMessage}</div>
+            ) : null}
+
             {hasStartedSession && !hasQuestions && startState.status !== "error" ? (
               <p className="text-sm text-muted-foreground">Henter spørgsmål...</p>
             ) : null}
             {!hasStartedSession && selectableEntitlements.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Der er ingen DISC-versioner tilgængelige for denne konto lige nu.</p>
+              <p className="text-sm text-muted-foreground">Start er deaktiveret, indtil mindst én gyldig DISC-version er tilgængelig.</p>
             ) : null}
             {!hasStartedSession ? (
               <div className="rounded-xl border border-border/70 bg-muted/20 p-4 text-sm text-muted-foreground">

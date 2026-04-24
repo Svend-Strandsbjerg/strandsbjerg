@@ -1,7 +1,7 @@
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { canAccessAdminFromSubject, canAccessFamilyFromSubject, canAccessInvestmentsFromSubject } from "@/lib/access-rules";
+import { canAccessAdminFromSubject, canAccessDiscAdminFromSubject, canAccessFamilyFromSubject, canAccessInvestmentsFromSubject } from "@/lib/access-rules";
 import { auth } from "@/lib/auth";
 import {
   EDIT_ACCESS_COOKIE,
@@ -19,6 +19,7 @@ type SessionUser = {
   id: string;
   role?: "ADMIN" | "USER";
   approvalStatus?: "PENDING" | "APPROVED" | "REJECTED";
+  isDiscAdmin?: boolean;
 };
 
 function fromSearchParams(searchParams?: SearchParams) {
@@ -36,6 +37,10 @@ export function canAccessInvestments(user?: SessionUser | null) {
 
 export function canAccessAdmin(user?: SessionUser | null) {
   return canAccessAdminFromSubject(user);
+}
+
+export function canAccessDiscAdmin(user?: SessionUser | null) {
+  return canAccessDiscAdminFromSubject(user);
 }
 
 export async function requireUser() {
@@ -104,6 +109,16 @@ export async function requireAdmin(searchParams?: SearchParams) {
   const user = await requireUser();
 
   if (!canAccessAdmin(user)) {
+    redirect("/");
+  }
+
+  return user;
+}
+
+export async function requireDiscAdmin() {
+  const user = await requireUser();
+
+  if (!canAccessDiscAdmin(user)) {
     redirect("/");
   }
 

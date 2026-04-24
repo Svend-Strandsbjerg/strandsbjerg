@@ -28,7 +28,12 @@ export default async function DiscOverviewPage({ searchParams }: DiscOverviewPag
   });
   versionEntitlements = resolution.visibleEntitlements;
   autoSelectedAssessmentVersionId = resolution.autoSelectedAssessmentVersionId;
-  const versionDiscoveryError = versionEntitlements.length === 0 ? "Kunne ikke hente DISC-versioner lige nu." : null;
+  const versionDiscoveryMessage =
+    resolution.discoveryState === "empty"
+      ? "DISC-tests er midlertidigt ikke tilgængelige, fordi der ikke er konfigureret nogen assessment-versioner."
+      : resolution.discoveryState === "failed"
+        ? "DISC-versioner kunne ikke hentes lige nu. Prøv igen om lidt."
+        : null;
 
   const totalAssessmentCountPromise = prisma.discAssessment.count({
     where: { userId: user.id },
@@ -93,7 +98,7 @@ export default async function DiscOverviewPage({ searchParams }: DiscOverviewPag
       userId={user.id}
       versionEntitlements={versionEntitlements}
       autoSelectedAssessmentVersionId={autoSelectedAssessmentVersionId}
-      versionDiscoveryError={versionDiscoveryError}
+      versionDiscoveryMessage={versionDiscoveryMessage}
       assessments={assessmentsWithShares}
       totalAssessmentCount={totalAssessmentCount}
       hasCompanyDiscAccess={hasCompanyAreaAccess}

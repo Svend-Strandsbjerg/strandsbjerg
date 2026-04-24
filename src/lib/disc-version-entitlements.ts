@@ -39,6 +39,7 @@ type EffectiveEntitlementPolicy = {
 };
 
 export type DiscVersionEntitlementResolution = {
+  discoveryState: "ok" | "empty" | "failed";
   discoveredVersions: DiscAssessmentVersion[];
   entitlements: DiscVersionEntitlement[];
   visibleEntitlements: DiscVersionEntitlement[];
@@ -353,6 +354,7 @@ export function resolveDiscVersionEntitlements(input: DiscVersionEntitlementCont
   const autoSelectedAssessmentVersionId = selectableEntitlements.length === 1 ? selectableEntitlements[0].version.id : null;
 
   return {
+    discoveryState: "ok",
     discoveredVersions: input.discoveredVersions,
     entitlements,
     visibleEntitlements,
@@ -390,10 +392,13 @@ export async function getPersonalDiscVersionEntitlements(input: { user: Pick<Use
   const accessInputs = await resolveAccessInputs({ flow: "personal", user: input.user });
   const policy = resolveEffectivePolicy({ flow: "personal", user: input.user }, accessInputs);
   let discoveredVersions: DiscAssessmentVersion[] = [];
+  let discoveryState: "ok" | "empty" | "failed" = "ok";
 
   try {
     discoveredVersions = await getDiscAssessmentVersions();
+    discoveryState = discoveredVersions.length === 0 ? "empty" : "ok";
   } catch (error) {
+    discoveryState = "failed";
     logServerEvent("warn", "disc_personal_entitlements_discovery_failed", {
       userId: input.user.id,
       fallback: "empty_entitlements",
@@ -407,6 +412,7 @@ export async function getPersonalDiscVersionEntitlements(input: { user: Pick<Use
     discoveredVersions,
     policy,
   });
+  resolution.discoveryState = discoveryState;
 
   logEntitlementSummary(
     {
@@ -467,6 +473,7 @@ export async function getInviteDiscVersionEntitlements(input: {
     discoveredVersions,
     policy,
   });
+  resolution.discoveryState = discoveredVersions.length === 0 ? "empty" : "ok";
 
   logEntitlementSummary(
     {

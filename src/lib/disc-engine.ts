@@ -516,9 +516,71 @@ const DISCOVERY_PATH = "/products/disc/versions";
 let cachedDiscoveredVersions: DiscAssessmentVersion[] | null = null;
 let cachedDiscoveredVersionsAt = 0;
 let cachedDiscoveryError: { at: number; message: string } | null = null;
+let cachedDiscoveredProductLine: string | null = null;
 
 const DISCOVERY_CACHE_TTL_MS = 60_000;
 const DISCOVERY_ERROR_COOLDOWN_MS = 15_000;
+
+export type DiscVersionDiagnostic = {
+  key: string | null;
+  tier: string | null;
+  assessmentVersionId: string;
+  itemCount: number | null;
+  estimatedCompletionMinutes: number | null;
+  intendedUse: string | null;
+  deliveryMode: string | null;
+};
+
+export type DiscVersionDiscoveryDiagnostics = {
+  configuredPath: string;
+  resolvedPathname: string;
+  productLine: string | null;
+  versionCount: number;
+  versions: DiscVersionDiagnostic[];
+};
+
+function readDiscoveryProductLine(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  return readStringKey(payload as Record<string, unknown>, "productLine");
+}
+
+function extractVersionDiagnostics(payload: unknown): DiscVersionDiagnostic[] {
+  if (!payload || typeof payload !== "object") {
+    return [];
+  }
+
+  const root = payload as Record<string, unknown>;
+  if (!Array.isArray(root.versions)) {
+    return [];
+  }
+
+  return root.versions
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") {
+        return null;
+      }
+
+      const record = entry as Record<string, unknown>;
+      const assessmentVersionId = readStringKey(record, "assessmentVersionId");
+      if (!assessmentVersionId) {
+        return null;
+      }
+
+      return {
+        key: readStringKey(record, "key"),
+        tier: readStringKey(record, "tier"),
+        assessmentVersionId,
+        itemCount: readNumberKey(record, "itemCount"),
+        estimatedCompletionMinutes: readNumberKey(record, "estimatedCompletionMinutes"),
+        intendedUse: readStringKey(record, "intendedUse"),
+        deliveryMode: readStringKey(record, "deliveryMode"),
+      } satisfies DiscVersionDiagnostic;
+    })
+    .filter((entry): entry is DiscVersionDiagnostic => Boolean(entry));
+}
 
 export async function getDiscAssessmentVersions(): Promise<DiscAssessmentVersion[]> {
   const now = Date.now();
@@ -546,9 +608,19 @@ export async function getDiscAssessmentVersions(): Promise<DiscAssessmentVersion
   try {
     const result = await discEngineGetRequest<unknown>(DISCOVERY_PATH, { suppressLogs: true });
     const versions = extractAssessmentVersions(result);
+    const productLine = readDiscoveryProductLine(result);
+    cachedDiscoveredProductLine = productLine;
 
     if (versions.length === 0) {
-      throw new DiscEngineError("disc-engine discovery payload contained no assessment versions.", 200, result);
+      cachedDiscoveredVersions = [];
+      cachedDiscoveredVersionsAt = Date.now();
+      cachedDiscoveryError = null;
+      logServerEvent("warn", "disc_version_discovery_empty", {
+        configuredPath: DISCOVERY_PATH,
+        resolvedPathname: urlContext.resolvedPathname,
+        productLine,
+      });
+      return [];
     }
 
     cachedDiscoveredVersions = versions;
@@ -558,6 +630,7 @@ export async function getDiscAssessmentVersions(): Promise<DiscAssessmentVersion
     logServerEvent("info", "disc_version_discovery_succeeded", {
       configuredPath: DISCOVERY_PATH,
       resolvedPathname: urlContext.resolvedPathname,
+      productLine,
       versionCount: versions.length,
       versions: versions.map((version) => ({
         id: version.id,
@@ -642,6 +715,22 @@ export async function createDiscSession(input: CreateDiscSessionInput): Promise<
   return {
     ...(result as Record<string, unknown>),
     sessionId,
+  };
+}
+
+export async function getDiscVersionDiscoveryDiagnostics(): Promise<DiscVersionDiscoveryDiagnostics> {
+  const baseUrl = getRequiredEnv("DISC_ENGINE_BASE_URL");
+  const urlContext = getUrlLogContext(baseUrl, DISCOVERY_PATH);
+  const payload = await discEngineGetRequest<unknown>(DISCOVERY_PATH, { suppressLogs: true });
+  const versions = extractVersionDiagnostics(payload);
+  const productLine = readDiscoveryProductLine(payload) ?? cachedDiscoveredProductLine;
+
+  return {
+    configuredPath: DISCOVERY_PATH,
+    resolvedPathname: urlContext.resolvedPathname,
+    productLine,
+    versionCount: versions.length,
+    versions,
   };
 }
 
