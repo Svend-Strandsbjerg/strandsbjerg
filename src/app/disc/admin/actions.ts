@@ -16,13 +16,19 @@ function parseTier(value: FormDataEntryValue | null): DiscTierAccess | null {
   return null;
 }
 
+function resolveRedirectPath(formData: FormData): "/disc/admin" | "/admin/disc" {
+  const redirectTo = String(formData.get("redirectTo") ?? "").trim();
+  return redirectTo === "/admin/disc" ? "/admin/disc" : "/disc/admin";
+}
+
 export async function updateUserDiscAccess(formData: FormData) {
   const admin = await requireDiscAdmin();
   const userId = String(formData.get("userId") ?? "").trim();
   const tier = parseTier(formData.get("tier"));
+  const redirectPath = resolveRedirectPath(formData);
 
   if (!userId || !tier) {
-    redirect("/disc/admin?status=error");
+    redirect(`${redirectPath}?status=error`);
   }
 
   await prisma.user.update({
@@ -37,16 +43,18 @@ export async function updateUserDiscAccess(formData: FormData) {
   });
 
   revalidatePath("/disc/admin");
-  redirect("/disc/admin?status=user_updated");
+  revalidatePath("/admin/disc");
+  redirect(`${redirectPath}?status=user_updated`);
 }
 
 export async function updateCompanyDiscAccess(formData: FormData) {
   const admin = await requireDiscAdmin();
   const companyId = String(formData.get("companyId") ?? "").trim();
   const tier = parseTier(formData.get("tier"));
+  const redirectPath = resolveRedirectPath(formData);
 
   if (!companyId || !tier) {
-    redirect("/disc/admin?status=error");
+    redirect(`${redirectPath}?status=error`);
   }
 
   await prisma.company.update({
@@ -61,5 +69,6 @@ export async function updateCompanyDiscAccess(formData: FormData) {
   });
 
   revalidatePath("/disc/admin");
-  redirect("/disc/admin?status=company_updated");
+  revalidatePath("/admin/disc");
+  redirect(`${redirectPath}?status=company_updated`);
 }
