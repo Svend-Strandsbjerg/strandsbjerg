@@ -34,7 +34,7 @@ export async function SiteHeader() {
           {session?.user ? <TopNavItemLink href="/account">My User</TopNavItemLink> : null}
           {canAccessFamily(session?.user) ? <TopNavItemLink href={FAMILY_PRIVATE_BASE_PATH}>Family</TopNavItemLink> : null}
           {canAccessInvestments(session?.user) ? <TopNavItemLink href={INVESTMENTS_PRIVATE_BASE_PATH}>Investments</TopNavItemLink> : null}
-          {canAccessDiscAdmin(session?.user) ? <TopNavItemLink href="/disc/admin">DISC admin</TopNavItemLink> : null}
+          {canAccessDiscAdmin(session?.user) ? <TopNavItemLink href="/admin/disc">DISC administration</TopNavItemLink> : null}
           {!editModeEnabled && canAccessAdmin(session?.user) ? <TopNavItemLink href="/admin">Admin</TopNavItemLink> : null}
           {editModeEnabled ? <TopNavItemLink href="/admin">Edit</TopNavItemLink> : null}
           <ThemeToggle />
