@@ -90,6 +90,7 @@ model User {
   image          String?
   passwordHash   String?
   role           Role           @default(USER)
+  isDiscAdmin    Boolean        @default(false)
   approvalStatus ApprovalStatus @default(PENDING)
   discMaxTierOverride DiscTierAccess?
 

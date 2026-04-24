@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { auth } from "@/lib/auth";
+import { canAccessDiscAdmin } from "@/lib/access";
 import { canAccessCompanyArea, canCreateCompanyProfile } from "@/lib/company-access";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function DiscLandingPage() {
   const session = await auth();
   const isAuthenticated = Boolean(session?.user?.id);
+  const showDiscAdmin = canAccessDiscAdmin(session?.user);
   const showCompanyArea = session?.user?.id
     ? (await canAccessCompanyArea(session.user.id)) || (await canCreateCompanyProfile(session.user.id, session.user.role))
     : false;
@@ -31,6 +33,11 @@ export default async function DiscLandingPage() {
               {showCompanyArea ? (
                 <Button asChild variant="outline">
                   <Link href="/disc/company">Virksomheds-overblik</Link>
+                </Button>
+              ) : null}
+              {showDiscAdmin ? (
+                <Button asChild variant="outline">
+                  <Link href="/disc/admin">DISC admin</Link>
                 </Button>
               ) : null}
             </>

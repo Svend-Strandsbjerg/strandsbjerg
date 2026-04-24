@@ -5,6 +5,7 @@ export type AccessSubject = {
   id?: string | null;
   role?: AccessRole | null;
   approvalStatus?: AccessApprovalStatus | null;
+  isDiscAdmin?: boolean | null;
 };
 
 export function isApproved(subject?: AccessSubject | null) {
@@ -21,4 +22,8 @@ export function canAccessInvestmentsFromSubject(subject?: AccessSubject | null) 
 
 export function canAccessAdminFromSubject(subject?: AccessSubject | null) {
   return Boolean(isApproved(subject) && subject?.role === "ADMIN");
+}
+
+export function canAccessDiscAdminFromSubject(subject?: AccessSubject | null) {
+  return Boolean(isApproved(subject) && subject?.isDiscAdmin);
 }

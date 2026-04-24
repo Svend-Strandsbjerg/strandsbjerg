@@ -83,6 +83,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: user.name,
           role: user.role,
           approvalStatus: normalizeApprovalStatus(user.approvalStatus),
+          isDiscAdmin: user.isDiscAdmin,
         };
       },
     }),
@@ -116,15 +117,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.sub = user.id;
         token.role = user.role ?? "USER";
         token.approvalStatus = normalizeApprovalStatus(user.approvalStatus);
+        token.isDiscAdmin = Boolean(user.isDiscAdmin);
       } else if (token.sub) {
         const latestUser = await prisma.user.findUnique({
           where: { id: token.sub },
-          select: { role: true, approvalStatus: true },
+          select: { role: true, approvalStatus: true, isDiscAdmin: true },
         });
 
         if (latestUser) {
           token.role = latestUser.role;
           token.approvalStatus = normalizeApprovalStatus(latestUser.approvalStatus);
+          token.isDiscAdmin = latestUser.isDiscAdmin;
         }
       }
 
@@ -135,6 +138,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.id = token.sub ?? "";
         session.user.role = token.role ?? "USER";
         session.user.approvalStatus = normalizeApprovalStatus(token.approvalStatus);
+        session.user.isDiscAdmin = Boolean(token.isDiscAdmin);
       }
       return session;
     },
