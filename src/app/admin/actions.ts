@@ -1,11 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { ApprovalStatus, Role } from "@prisma/client";
 
-import { requireAdmin } from "@/lib/access";
+import { requireSiteAdmin } from "@/lib/access";
 import { defaultHomeContent, defaultProfessionalContent, type ProfessionalPageContent } from "@/lib/content";
-import { hashPassword } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
 
 import type { AdminActionState } from "@/app/admin/action-state";
@@ -21,7 +19,7 @@ function linesToList(raw: FormDataEntryValue | null, fallback: string[]) {
 
 export async function saveHomeContent(_: AdminActionState, formData: FormData): Promise<AdminActionState> {
   try {
-    await requireAdmin();
+    await requireSiteAdmin();
 
     const homePageContent = (prisma as unknown as Record<string, unknown>).homePageContent as
       | {
@@ -34,7 +32,7 @@ export async function saveHomeContent(_: AdminActionState, formData: FormData): 
       | undefined;
 
     if (!homePageContent) {
-      return { status: "error", message: "Database client is out of date. Run prisma generate and restart the server." };
+      return { status: "error", message: "Database-klienten er ikke opdateret. Kør prisma generate og genstart serveren." };
     }
 
     const headline = String(formData.get("headline") ?? "").trim() || defaultHomeContent.headline;
@@ -48,17 +46,17 @@ export async function saveHomeContent(_: AdminActionState, formData: FormData): 
     });
 
     revalidatePath("/");
-    revalidatePath("/admin");
+    revalidatePath("/admin/site");
 
-    return { status: "success", message: "Home page content saved." };
+    return { status: "success", message: "Forsideindhold er gemt." };
   } catch {
-    return { status: "error", message: "Could not save home page content. Please try again." };
+    return { status: "error", message: "Kunne ikke gemme forsideindhold. Prøv igen." };
   }
 }
 
 export async function saveProfessionalContent(_: AdminActionState, formData: FormData): Promise<AdminActionState> {
   try {
-    await requireAdmin();
+    await requireSiteAdmin();
 
     const professionalPageContent = (prisma as unknown as Record<string, unknown>).professionalPageContent as
       | {
@@ -84,7 +82,7 @@ export async function saveProfessionalContent(_: AdminActionState, formData: For
       | undefined;
 
     if (!professionalPageContent) {
-      return { status: "error", message: "Database client is out of date. Run prisma generate and restart the server." };
+      return { status: "error", message: "Database-klienten er ikke opdateret. Kør prisma generate og genstart serveren." };
     }
 
     const heroTitle = String(formData.get("heroTitle") ?? "").trim() || defaultProfessionalContent.heroTitle;
@@ -119,77 +117,10 @@ export async function saveProfessionalContent(_: AdminActionState, formData: For
     });
 
     revalidatePath("/professional");
-    revalidatePath("/admin");
+    revalidatePath("/admin/site");
 
-    return { status: "success", message: "Professional page content saved." };
+    return { status: "success", message: "Indhold for professionel side er gemt." };
   } catch {
-    return { status: "error", message: "Could not save professional content. Please try again." };
-  }
-}
-
-export async function updateUserAccess(_: AdminActionState, formData: FormData): Promise<AdminActionState> {
-  try {
-    await requireAdmin();
-
-    const userId = String(formData.get("userId") ?? "");
-    const role = String(formData.get("role") ?? "");
-    const approvalStatus = String(formData.get("approvalStatus") ?? "");
-
-    if (!userId || !["ADMIN", "USER"].includes(role) || !["PENDING", "APPROVED", "REJECTED"].includes(approvalStatus)) {
-      return { status: "error", message: "Invalid user update request." };
-    }
-
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        role: role as Role,
-        approvalStatus: approvalStatus as ApprovalStatus,
-      },
-    });
-
-    revalidatePath("/admin");
-
-    return { status: "success", message: "User updated." };
-  } catch {
-    return { status: "error", message: "Could not update user." };
-  }
-}
-
-
-export async function setUserPassword(_: AdminActionState, formData: FormData): Promise<AdminActionState> {
-  try {
-    await requireAdmin();
-
-    const userId = String(formData.get("userId") ?? "");
-    const newPassword = String(formData.get("newPassword") ?? "");
-    const confirmPassword = String(formData.get("confirmPassword") ?? "");
-
-    if (!userId) {
-      return { status: "error", message: "Invalid password update request." };
-    }
-
-    if (newPassword.length < 8) {
-      return { status: "error", message: "Password must be at least 8 characters long." };
-    }
-
-    if (newPassword !== confirmPassword) {
-      return { status: "error", message: "Password confirmation does not match." };
-    }
-
-    const passwordHash = await hashPassword(newPassword);
-
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        passwordHash,
-        passwordChangedAt: new Date(),
-      },
-    });
-
-    revalidatePath("/admin");
-
-    return { status: "success", message: "New password saved." };
-  } catch {
-    return { status: "error", message: "Could not set a new password." };
+    return { status: "error", message: "Kunne ikke gemme indhold for professionel side. Prøv igen." };
   }
 }

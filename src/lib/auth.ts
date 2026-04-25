@@ -83,6 +83,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: user.name,
           role: user.role,
           approvalStatus: normalizeApprovalStatus(user.approvalStatus),
+          isSiteAdmin: user.isSiteAdmin,
           isDiscAdmin: user.isDiscAdmin,
         };
       },
@@ -117,16 +118,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.sub = user.id;
         token.role = user.role ?? "USER";
         token.approvalStatus = normalizeApprovalStatus(user.approvalStatus);
+        token.isSiteAdmin = Boolean(user.isSiteAdmin);
         token.isDiscAdmin = Boolean(user.isDiscAdmin);
       } else if (token.sub) {
         const latestUser = await prisma.user.findUnique({
           where: { id: token.sub },
-          select: { role: true, approvalStatus: true, isDiscAdmin: true },
+          select: { role: true, approvalStatus: true, isSiteAdmin: true, isDiscAdmin: true },
         });
 
         if (latestUser) {
           token.role = latestUser.role;
           token.approvalStatus = normalizeApprovalStatus(latestUser.approvalStatus);
+          token.isSiteAdmin = latestUser.isSiteAdmin;
           token.isDiscAdmin = latestUser.isDiscAdmin;
         }
       }
@@ -138,6 +141,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.id = token.sub ?? "";
         session.user.role = token.role ?? "USER";
         session.user.approvalStatus = normalizeApprovalStatus(token.approvalStatus);
+        session.user.isSiteAdmin = Boolean(token.isSiteAdmin);
         session.user.isDiscAdmin = Boolean(token.isDiscAdmin);
       }
       return session;

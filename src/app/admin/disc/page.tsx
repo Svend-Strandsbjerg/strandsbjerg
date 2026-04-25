@@ -1,6 +1,6 @@
 import { DiscAdminAccessDenied } from "@/components/admin/disc-admin-access-denied";
 import { DiscAdminCockpit } from "@/components/admin/disc-admin-cockpit";
-import { canAccessAdmin, canAccessDiscAdmin, requireUser } from "@/lib/access";
+import { canAccessAdmin, canAccessDiscAdmin, canAccessSiteAdmin, requireUser } from "@/lib/access";
 import { getDiscAdminDashboardData, getSingleParam } from "@/lib/admin/disc-admin";
 import { logServerEvent } from "@/lib/logger";
 
@@ -20,6 +20,7 @@ export default async function AdminDiscPage({ searchParams }: DiscAdminPageProps
     route: "/admin/disc",
     userId: user.id,
     isAdmin: hasAdminAccess,
+    isSiteAdmin: canAccessSiteAdmin(user),
     isDiscAdmin: Boolean(user.isDiscAdmin),
     allowed: hasCockpitAccess,
   });

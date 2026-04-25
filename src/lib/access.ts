@@ -1,7 +1,14 @@
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { canAccessAdminFromSubject, canAccessDiscAdminFromSubject, canAccessFamilyFromSubject, canAccessInvestmentsFromSubject } from "@/lib/access-rules";
+import {
+  canAccessAdminCockpitFromSubject,
+  canAccessAdminFromSubject,
+  canAccessDiscAdminFromSubject,
+  canAccessFamilyFromSubject,
+  canAccessInvestmentsFromSubject,
+  canAccessSiteAdminFromSubject,
+} from "@/lib/access-rules";
 import { auth } from "@/lib/auth";
 import { logServerEvent } from "@/lib/logger";
 import {
@@ -20,6 +27,7 @@ type SessionUser = {
   id: string;
   role?: "ADMIN" | "USER";
   approvalStatus?: "PENDING" | "APPROVED" | "REJECTED";
+  isSiteAdmin?: boolean;
   isDiscAdmin?: boolean;
 };
 
@@ -42,6 +50,14 @@ export function canAccessAdmin(user?: SessionUser | null) {
 
 export function canAccessDiscAdmin(user?: SessionUser | null) {
   return canAccessDiscAdminFromSubject(user);
+}
+
+export function canAccessSiteAdmin(user?: SessionUser | null) {
+  return canAccessSiteAdminFromSubject(user);
+}
+
+export function canAccessAdminCockpit(user?: SessionUser | null) {
+  return canAccessAdminCockpitFromSubject(user);
 }
 
 export async function requireUser() {
@@ -110,7 +126,26 @@ export async function requireAdmin(searchParams?: SearchParams) {
   const user = await requireUser();
 
   if (!canAccessAdmin(user)) {
-    redirect("/");
+    redirect("/login?state=restricted");
+  }
+
+  return user;
+}
+
+export async function requireUserAdmin() {
+  return requireAdmin();
+}
+
+export async function requireSiteAdmin() {
+  if (isEditModeEnabled()) {
+    await requireAdmin();
+    return null;
+  }
+
+  const user = await requireUser();
+
+  if (!canAccessSiteAdmin(user)) {
+    redirect("/admin?status=adgang_nægtet");
   }
 
   return user;
@@ -128,7 +163,7 @@ export async function requireDiscAdmin() {
   });
 
   if (!allowed) {
-    redirect("/");
+    redirect("/admin?status=adgang_nægtet");
   }
 
   return user;
