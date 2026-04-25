@@ -38,7 +38,10 @@ export function DiscAdminCockpit({ query, status, users, companies, diagnostics,
       <section className="rounded-3xl border border-border/80 bg-card p-6 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">DISC administration</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">DISC administration</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Administrér DISC-adgang for brugere og virksomheder.</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Administrér DISC-adgang for brugere og virksomheder. Adgangsniveauer er kumulative: Standard inkluderer Gratis, og
+          Dybdegående inkluderer både Standard og Gratis.
+        </p>
         <form className="mt-4 flex gap-2" action={basePath} method="get">
           <input
             type="search"
@@ -98,7 +101,9 @@ export function DiscAdminCockpit({ query, status, users, companies, diagnostics,
       <section className="grid gap-4 lg:grid-cols-2">
         <article className="rounded-2xl border border-border/80 bg-card p-5">
           <h2 className="text-lg font-semibold">Brugeradgang</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Opdater adgangsniveau for en bruger.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Opdater brugerens DISC adgangsniveau. Dette område styrer kun DISC-rettigheder, ikke globale adminroller.
+          </p>
           <div className="mt-3 space-y-3">
             {users.map((user) => (
               <form key={user.id} action={updateUserDiscAccess} className="rounded-lg border p-3">
@@ -109,8 +114,8 @@ export function DiscAdminCockpit({ query, status, users, companies, diagnostics,
                 <div className="mt-2 flex items-center gap-2">
                   <select name="tier" defaultValue={user.discMaxTierOverride ?? "FREE"} className="h-9 rounded-md border px-2 text-sm">
                     <option value="FREE">Gratis</option>
-                    <option value="STANDARD">Standard</option>
-                    <option value="DEEP">Dybdegående</option>
+                    <option value="STANDARD">Standard (inkl. Gratis)</option>
+                    <option value="DEEP">Dybdegående (inkl. Standard + Gratis)</option>
                   </select>
                   <button type="submit" className="h-9 rounded-md border px-3 text-sm">Gem adgangsniveau</button>
                 </div>
@@ -121,7 +126,9 @@ export function DiscAdminCockpit({ query, status, users, companies, diagnostics,
 
         <article className="rounded-2xl border border-border/80 bg-card p-5">
           <h2 className="text-lg font-semibold">Virksomhedsadgang</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Opdater virksomhedens adgangsniveau.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Opdater virksomhedens baseline for DISC adgangsniveau. Brugere kan stadig få individuelle overrides ovenpå baseline.
+          </p>
           <div className="mt-3 space-y-3">
             {companies.map((company) => (
               <form key={company.id} action={updateCompanyDiscAccess} className="rounded-lg border p-3">
@@ -132,8 +139,8 @@ export function DiscAdminCockpit({ query, status, users, companies, diagnostics,
                 <div className="mt-2 flex items-center gap-2">
                   <select name="tier" defaultValue={company.discMaxTierAccess} className="h-9 rounded-md border px-2 text-sm">
                     <option value="FREE">Gratis</option>
-                    <option value="STANDARD">Standard</option>
-                    <option value="DEEP">Dybdegående</option>
+                    <option value="STANDARD">Standard (inkl. Gratis)</option>
+                    <option value="DEEP">Dybdegående (inkl. Standard + Gratis)</option>
                   </select>
                   <button type="submit" className="h-9 rounded-md border px-3 text-sm">Gem adgangsniveau</button>
                 </div>

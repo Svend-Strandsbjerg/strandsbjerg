@@ -5,6 +5,7 @@ declare module "next-auth" {
   interface User {
     role?: "ADMIN" | "USER";
     approvalStatus?: "PENDING" | "APPROVED" | "REJECTED";
+    isSiteAdmin?: boolean;
     isDiscAdmin?: boolean;
   }
 
@@ -13,6 +14,7 @@ declare module "next-auth" {
       id: string;
       role?: "ADMIN" | "USER";
       approvalStatus?: "PENDING" | "APPROVED" | "REJECTED";
+      isSiteAdmin?: boolean;
       isDiscAdmin?: boolean;
     };
   }
@@ -22,6 +24,7 @@ declare module "next-auth/jwt" {
   interface JWT {
     role?: "ADMIN" | "USER";
     approvalStatus?: "PENDING" | "APPROVED" | "REJECTED";
+    isSiteAdmin?: boolean;
     isDiscAdmin?: boolean;
   }
 }

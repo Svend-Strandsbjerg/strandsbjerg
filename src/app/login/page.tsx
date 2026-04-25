@@ -2,7 +2,7 @@ import Link from "next/link";
 import { AuthError } from "next-auth";
 import { redirect } from "next/navigation";
 
-import { canAccessAdmin, canAccessFamily, canAccessInvestments } from "@/lib/access";
+import { canAccessAdminCockpit, canAccessFamily, canAccessInvestments } from "@/lib/access";
 import { auth, signIn } from "@/lib/auth";
 import { FAMILY_PRIVATE_BASE_PATH, INVESTMENTS_PRIVATE_BASE_PATH } from "@/lib/private-routes";
 
@@ -31,7 +31,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const authErrorKey = !isAuthenticated ? (Array.isArray(params?.error) ? params?.error[0] : params?.error) : undefined;
 
   if (isAuthenticated && status === "APPROVED") {
-    if (canAccessAdmin(user)) {
+    if (canAccessAdminCockpit(user)) {
       redirect("/admin");
     }
 
@@ -104,7 +104,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                 Open investments
               </Link>
             ) : null}
-            {canAccessAdmin(user) ? (
+            {canAccessAdminCockpit(user) ? (
               <Link href="/admin" className="inline-block underline-offset-4 hover:underline">
                 Open admin
               </Link>

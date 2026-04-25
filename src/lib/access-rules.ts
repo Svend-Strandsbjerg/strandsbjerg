@@ -5,6 +5,7 @@ export type AccessSubject = {
   id?: string | null;
   role?: AccessRole | null;
   approvalStatus?: AccessApprovalStatus | null;
+  isSiteAdmin?: boolean | null;
   isDiscAdmin?: boolean | null;
 };
 
@@ -24,8 +25,19 @@ export function canAccessAdminFromSubject(subject?: AccessSubject | null) {
   return Boolean(isApproved(subject) && subject?.role === "ADMIN");
 }
 
+export function canAccessSiteAdminFromSubject(subject?: AccessSubject | null) {
+  // Rule: general admins are superusers and can always access site administration.
+  return Boolean(isApproved(subject) && (subject?.role === "ADMIN" || subject?.isSiteAdmin));
+}
+
 export function canAccessDiscAdminFromSubject(subject?: AccessSubject | null) {
   // Rule: general admins are considered superior for DISC admin cockpit access.
   // Dedicated DISC admins (isDiscAdmin=true) can also access the same cockpit.
   return Boolean(isApproved(subject) && (subject?.role === "ADMIN" || subject?.isDiscAdmin));
+}
+
+export function canAccessAdminCockpitFromSubject(subject?: AccessSubject | null) {
+  return Boolean(
+    canAccessAdminFromSubject(subject) || canAccessSiteAdminFromSubject(subject) || canAccessDiscAdminFromSubject(subject),
+  );
 }

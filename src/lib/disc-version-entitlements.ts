@@ -168,6 +168,10 @@ function chooseHigherTier(left: DiscTierAccessLevel, right: DiscTierAccessLevel)
 }
 
 function categoryFitsTier(category: DiscVersionCategory, maxTier: DiscTierAccessLevel) {
+  // Cumulative model:
+  // free => free only
+  // standard => standard + free
+  // deep => deep + standard + free
   if (category === "unknown") {
     return false;
   }
