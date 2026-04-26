@@ -1,134 +1,129 @@
 "use server";
 
-import { Prisma, SecurityType, TransactionType } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
 import { requireInvestmentAccessUser } from "@/lib/access";
+import { createMarketDataService } from "@/lib/market-data";
 import { INVESTMENTS_PRIVATE_BASE_PATH } from "@/lib/private-routes";
 import { prisma } from "@/lib/prisma";
-
-function normalizeEnumInput<T extends string>(value: string, allowed: readonly T[], fieldLabel: string) {
-  const uppercaseValue = value.toUpperCase() as T;
-
-  if (!allowed.includes(uppercaseValue)) {
-    throw new Error(`Invalid ${fieldLabel}`);
-  }
-
-  return uppercaseValue;
-}
 
 function normalizeInputValue(formData: FormData, fieldName: string) {
   return String(formData.get(fieldName) ?? "").trim();
 }
 
-export async function createSecurity(formData: FormData) {
+export async function createInvestmentPurchase(formData: FormData) {
   const user = await requireInvestmentAccessUser();
 
-  const name = normalizeInputValue(formData, "name");
-  const code = normalizeInputValue(formData, "code").toUpperCase();
-  const isin = normalizeInputValue(formData, "isin").toUpperCase() || null;
-  const securityTypeRaw = normalizeInputValue(formData, "type");
+  const isin = normalizeInputValue(formData, "isin").toUpperCase();
+  const securityName = normalizeInputValue(formData, "securityName");
+  const transactedOnRaw = normalizeInputValue(formData, "purchaseDate");
   const currency = normalizeInputValue(formData, "currency").toUpperCase();
-  const provider = normalizeInputValue(formData, "provider") || null;
-  const source = normalizeInputValue(formData, "source") || null;
+  const quantityRaw = Number(formData.get("quantity") ?? 0);
+  const priceRaw = Number(formData.get("purchasePrice") ?? 0);
+  const notesRaw = normalizeInputValue(formData, "notes");
 
-  const type = normalizeEnumInput(securityTypeRaw, Object.values(SecurityType), "security type");
-
-  if (!name) {
-    throw new Error("Security name is required.");
+  if (!isin || !currency) {
+    throw new Error("ISIN og valuta er påkrævet.");
   }
 
-  if (!code) {
-    throw new Error("Ticker/code is required.");
+  const purchaseDate = new Date(transactedOnRaw);
+
+  if (Number.isNaN(purchaseDate.getTime()) || Number.isNaN(quantityRaw) || quantityRaw <= 0 || Number.isNaN(priceRaw) || priceRaw <= 0) {
+    throw new Error("Ugyldige købsdata.");
   }
 
-  if (!currency) {
-    throw new Error("Currency is required.");
-  }
+  const marketDataService = createMarketDataService();
+  const marketSecurity = await marketDataService.resolveSecurity({
+    isin,
+    securityName,
+    currency,
+  });
 
-  const duplicateSecurity = await prisma.security.findFirst({
+  const security = await prisma.security.upsert({
     where: {
-      OR: [
-        { code },
-        ...(isin ? [{ isin }] : []),
-      ],
+      createdById_isin: {
+        createdById: user.id,
+        isin,
+      },
     },
-    select: {
-      code: true,
-      isin: true,
+    update: {
+      name: marketSecurity?.name || securityName || isin,
+      currency: marketSecurity?.currency || currency,
+      source: marketSecurity ? `Market data (${marketSecurity.provider})` : "Manual entry",
+    },
+    create: {
+      isin,
+      code: marketSecurity?.symbol || isin,
+      name: marketSecurity?.name || securityName || isin,
+      type: "OTHER",
+      currency: marketSecurity?.currency || currency,
+      provider: marketSecurity?.provider || "UNCONFIGURED",
+      source: marketSecurity ? `Market data (${marketSecurity.provider})` : "Manual entry",
+      createdById: user.id,
     },
   });
 
-  if (duplicateSecurity) {
-    if (duplicateSecurity.code === code) {
-      throw new Error(`A security with ticker/code '${code}' already exists.`);
-    }
-
-    if (isin && duplicateSecurity.isin === isin) {
-      throw new Error(`A security with ISIN '${isin}' already exists.`);
-    }
-  }
-
-  try {
-    await prisma.security.create({
-      data: {
-        name,
-        code,
-        isin,
-        type,
-        currency,
-        provider,
-        source,
-        createdById: user.id,
-      },
-    });
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      throw new Error("Security already exists. Ticker/code and ISIN must be unique.");
-    }
-
-    throw error;
-  }
+  await prisma.investmentTransaction.create({
+    data: {
+      securityId: security.id,
+      type: "BUY",
+      transactedOn: purchaseDate,
+      quantity: quantityRaw,
+      price: priceRaw,
+      notes: notesRaw || null,
+      createdById: user.id,
+    },
+  });
 
   revalidatePath(INVESTMENTS_PRIVATE_BASE_PATH);
 }
 
-export async function createTransaction(formData: FormData) {
+export async function saveManualPrice(formData: FormData) {
   const user = await requireInvestmentAccessUser();
 
   const securityId = normalizeInputValue(formData, "securityId");
-  const transactionTypeRaw = normalizeInputValue(formData, "type") || "BUY";
-  const transactedOnRaw = normalizeInputValue(formData, "transactedOn");
-  const quantityRaw = Number(formData.get("quantity") ?? 0);
-  const priceRaw = Number(formData.get("price") ?? 0);
-  const feesRaw = Number(formData.get("fees") ?? 0);
-  const notesRaw = normalizeInputValue(formData, "notes");
+  const priceRaw = Number(formData.get("manualPrice") ?? 0);
+  const currency = normalizeInputValue(formData, "currency").toUpperCase();
+  const pricedAtRaw = normalizeInputValue(formData, "pricedAt");
+  const notes = normalizeInputValue(formData, "notes");
 
-  const type = normalizeEnumInput(transactionTypeRaw, Object.values(TransactionType), "transaction type");
-  const transactedOn = new Date(transactedOnRaw);
+  const pricedAt = new Date(pricedAtRaw);
 
-  if (
-    !securityId ||
-    Number.isNaN(transactedOn.getTime()) ||
-    Number.isNaN(quantityRaw) ||
-    quantityRaw <= 0 ||
-    Number.isNaN(priceRaw) ||
-    priceRaw <= 0 ||
-    Number.isNaN(feesRaw) ||
-    feesRaw < 0
-  ) {
-    throw new Error("Invalid transaction data");
+  if (!securityId || Number.isNaN(priceRaw) || priceRaw <= 0 || !currency || Number.isNaN(pricedAt.getTime())) {
+    throw new Error("Ugyldig manuel kurs.");
   }
 
-  await prisma.investmentTransaction.create({
-    data: {
-      securityId,
-      type,
-      transactedOn,
-      quantity: quantityRaw,
+  const security = await prisma.security.findFirst({
+    where: {
+      id: securityId,
+      createdById: user.id,
+    },
+    select: { id: true },
+  });
+
+  if (!security) {
+    throw new Error("Papiret blev ikke fundet.");
+  }
+
+  await prisma.manualSecurityPrice.upsert({
+    where: {
+      createdById_securityId: {
+        createdById: user.id,
+        securityId,
+      },
+    },
+    update: {
       price: priceRaw,
-      fees: feesRaw > 0 ? feesRaw : null,
-      notes: notesRaw || null,
+      currency,
+      pricedAt,
+      notes: notes || null,
+    },
+    create: {
+      securityId,
+      price: priceRaw,
+      currency,
+      pricedAt,
+      notes: notes || null,
       createdById: user.id,
     },
   });

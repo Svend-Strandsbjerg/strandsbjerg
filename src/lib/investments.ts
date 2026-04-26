@@ -1,57 +1,49 @@
-import { SecurityType, TransactionType, type InvestmentTransaction, type Security } from "@prisma/client";
+import { SecurityType, TransactionType, type InvestmentTransaction, type ManualSecurityPrice, type Security } from "@prisma/client";
 
 export type SecurityWithTransactions = Security & {
   transactions: InvestmentTransaction[];
+  manualPrices: ManualSecurityPrice[];
 };
 
 export type HoldingPosition = {
   securityId: string;
-  code: string;
+  isin: string;
   name: string;
   type: SecurityType;
   currency: string;
-  quantity: number;
+  totalQuantity: number;
   investedAmount: number;
-  averagePrice: number;
+  averagePurchasePrice: number;
   transactionCount: number;
+  latestMarketPrice: number | null;
+  latestMarketPriceSource: "LIVE" | "MANUAL" | "UNAVAILABLE";
+  latestMarketPriceAsOf: Date | null;
+  latestMarketValue: number | null;
+  gainLossAmount: number | null;
+  gainLossPercent: number | null;
 };
 
 export const SECURITY_TYPE_LABELS: Record<SecurityType, string> = {
-  [SecurityType.STOCK]: "Stocks",
-  [SecurityType.INDEX_FUND]: "Index Funds",
-  [SecurityType.ETF]: "ETFs",
-  [SecurityType.OTHER]: "Other",
+  [SecurityType.STOCK]: "Aktier",
+  [SecurityType.INDEX_FUND]: "Indeksfonde",
+  [SecurityType.ETF]: "ETF'er",
+  [SecurityType.OTHER]: "Andet",
 };
 
-export const SECURITY_TYPE_OPTIONS: Array<{ value: SecurityType; label: string }> = [
-  { value: SecurityType.INDEX_FUND, label: "Index fund" },
-  { value: SecurityType.STOCK, label: "Stock" },
-  { value: SecurityType.ETF, label: "ETF" },
-  { value: SecurityType.OTHER, label: "Other" },
-];
-
-export const TRANSACTION_TYPE_OPTIONS: Array<{ value: TransactionType; label: string }> = [
-  { value: TransactionType.BUY, label: "Buy" },
-  { value: TransactionType.SELL, label: "Sell" },
-];
-
 export const INVESTMENTS_TABS = [
-  { href: "/m4z8r2q9t7y1", label: "Overview" },
-  { href: "/m4z8r2q9t7y1/index-funds", label: "Index Funds" },
-  { href: "/m4z8r2q9t7y1/stocks", label: "Stocks" },
-  { href: "/m4z8r2q9t7y1/etfs", label: "ETFs" },
-  { href: "/m4z8r2q9t7y1/transactions", label: "Transactions" },
-  { href: "/m4z8r2q9t7y1/holdings", label: "Holdings" },
+  { href: "/m4z8r2q9t7y1", label: "Overblik" },
+  { href: "/m4z8r2q9t7y1/transactions", label: "Transaktioner" },
+  { href: "/m4z8r2q9t7y1/holdings", label: "Beholdninger" },
 ] as const;
 
 function transactionDirection(type: TransactionType) {
   return type === TransactionType.SELL ? -1 : 1;
 }
 
-export function deriveHoldings(securities: SecurityWithTransactions[]): HoldingPosition[] {
+export function deriveHoldings(securities: SecurityWithTransactions[], latestLivePrices: Map<string, { price: number; asOf: Date }>) {
   return securities
-    .map((security) => {
-      let quantity = 0;
+    .map((security): HoldingPosition => {
+      let totalQuantity = 0;
       let investedAmount = 0;
 
       for (const transaction of security.transactions) {
@@ -59,35 +51,54 @@ export function deriveHoldings(securities: SecurityWithTransactions[]): HoldingP
         const transactionQuantity = transaction.quantity.toNumber() * factor;
         const fees = transaction.fees?.toNumber() ?? 0;
 
-        quantity += transactionQuantity;
+        totalQuantity += transactionQuantity;
         investedAmount += transactionQuantity * transaction.price.toNumber() + fees;
       }
 
+      const livePrice = security.isin ? latestLivePrices.get(security.isin) : undefined;
+      const manualPrice = security.manualPrices[0];
+      const latestMarketPrice = livePrice?.price ?? manualPrice?.price.toNumber() ?? null;
+      const latestMarketPriceAsOf = livePrice?.asOf ?? manualPrice?.pricedAt ?? null;
+
+      let latestMarketPriceSource: HoldingPosition["latestMarketPriceSource"] = "UNAVAILABLE";
+      if (livePrice) latestMarketPriceSource = "LIVE";
+      else if (manualPrice) latestMarketPriceSource = "MANUAL";
+
+      const latestMarketValue = latestMarketPrice !== null ? latestMarketPrice * totalQuantity : null;
+      const gainLossAmount = latestMarketValue !== null ? latestMarketValue - investedAmount : null;
+      const gainLossPercent = gainLossAmount !== null && investedAmount > 0 ? (gainLossAmount / investedAmount) * 100 : null;
+
       return {
         securityId: security.id,
-        code: security.code,
+        isin: security.isin ?? "-",
         name: security.name,
         type: security.type,
         currency: security.currency,
-        quantity,
+        totalQuantity,
         investedAmount,
-        averagePrice: quantity > 0 ? investedAmount / quantity : 0,
+        averagePurchasePrice: totalQuantity > 0 ? investedAmount / totalQuantity : 0,
         transactionCount: security.transactions.length,
+        latestMarketPrice,
+        latestMarketPriceSource,
+        latestMarketPriceAsOf,
+        latestMarketValue,
+        gainLossAmount,
+        gainLossPercent,
       };
     })
-    .filter((position) => position.quantity > 0)
+    .filter((position) => position.totalQuantity > 0)
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export function formatAmount(value: number) {
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat("da-DK", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
 }
 
 export function formatQuantity(value: number) {
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat("da-DK", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 6,
   }).format(value);
