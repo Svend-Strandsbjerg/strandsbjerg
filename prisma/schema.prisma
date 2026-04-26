@@ -97,7 +97,6 @@ model User {
 
   accounts               Account[]
   sessions               Session[]
-  votes                  Vote[]
   createdEvents          FamilyEvent[]           @relation("EventCreator")
   investments            InvestmentEntry[]       @relation("InvestmentCreator")
   securities             Security[]              @relation("SecurityCreator")
@@ -296,13 +295,15 @@ model VerificationToken {
 model FamilyEvent {
   id          String  @id @default(cuid())
   title       String
-  description String
+  description String?
+  shareToken  String  @unique
   location    String?
 
   createdById String
   createdBy   User   @relation("EventCreator", fields: [createdById], references: [id], onDelete: Cascade)
 
   dateOptions EventDateOption[]
+  votes       Vote[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -321,16 +322,18 @@ model EventDateOption {
 }
 
 model Vote {
-  id           String @id @default(cuid())
-  userId       String
-  dateOptionId String
+  id              String @id @default(cuid())
+  eventId         String
+  dateOptionId    String
+  participantName String
 
-  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event      FamilyEvent     @relation(fields: [eventId], references: [id], onDelete: Cascade)
   dateOption EventDateOption @relation(fields: [dateOptionId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
-  @@unique([userId, dateOptionId])
+  @@unique([eventId, participantName, dateOptionId])
+  @@index([eventId, participantName])
 }
 
 model HomePageContent {

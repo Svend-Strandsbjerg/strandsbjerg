@@ -31,8 +31,8 @@ export async function SiteHeader() {
               DISC
             </TopNavItemLink>
           ) : null}
-          {session?.user ? <TopNavItemLink href="/account">My User</TopNavItemLink> : null}
-          {canAccessFamily(session?.user) ? <TopNavItemLink href={FAMILY_PRIVATE_BASE_PATH}>Family</TopNavItemLink> : null}
+          {session?.user ? <TopNavItemLink href="/my-user">Min bruger</TopNavItemLink> : null}
+          {canAccessFamily(session?.user) ? <TopNavItemLink href={FAMILY_PRIVATE_BASE_PATH}>Familie</TopNavItemLink> : null}
           {canAccessInvestments(session?.user) ? <TopNavItemLink href={INVESTMENTS_PRIVATE_BASE_PATH}>Investments</TopNavItemLink> : null}
           {!editModeEnabled && canAccessAdminCockpit(session?.user) ? <TopNavItemLink href="/admin">Admin</TopNavItemLink> : null}
           {editModeEnabled ? <TopNavItemLink href="/admin">Edit</TopNavItemLink> : null}
