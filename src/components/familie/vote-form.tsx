@@ -2,20 +2,20 @@
 
 import { useState, useTransition } from "react";
 
-import { voteForEvent } from "@/app/x7k2p9q4v1m8/actions";
+import { submitFamilyPublicVote } from "@/app/x7k2p9q4v1m8/actions";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 type VoteFormProps = {
-  eventId: string;
+  shareToken: string;
   options: {
     id: string;
     candidateDate: string;
-    votes: { user: { name: string | null; email: string | null } }[];
+    votesCount: number;
   }[];
-  selectedOptionIds: string[];
 };
 
-export function VoteForm({ eventId, options, selectedOptionIds }: VoteFormProps) {
+export function VoteForm({ shareToken, options }: VoteFormProps) {
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
 
@@ -26,17 +26,24 @@ export function VoteForm({ eventId, options, selectedOptionIds }: VoteFormProps)
         setMessage(null);
         startTransition(async () => {
           try {
-            await voteForEvent(formData);
-            setMessage("Vote saved.");
+            await submitFamilyPublicVote(formData);
+            setMessage("Tak. Din stemme er gemt.");
           } catch {
-            setMessage("Unable to save vote. Please select at least one date.");
+            setMessage("Kunne ikke gemme stemme. Udfyld navn og vælg mindst én dato.");
           }
         });
       }}
     >
-      <input type="hidden" name="eventId" value={eventId} />
+      <input type="hidden" name="shareToken" value={shareToken} />
 
-      <p className="text-sm text-muted-foreground">Choose one or more options that work for you.</p>
+      <div className="space-y-1.5">
+        <label htmlFor="participant-name" className="block text-sm font-medium">
+          Deltagerens navn
+        </label>
+        <Input id="participant-name" name="participantName" required placeholder="Fx Anne" />
+      </div>
+
+      <p className="text-sm text-muted-foreground">Her kan vi komme</p>
 
       <div className="space-y-3">
         {options.map((option) => (
@@ -44,16 +51,10 @@ export function VoteForm({ eventId, options, selectedOptionIds }: VoteFormProps)
             key={option.id}
             className="flex items-start gap-3 rounded-2xl border border-border/80 bg-muted/25 p-4 transition hover:bg-muted/40"
           >
-            <input
-              type="checkbox"
-              name="dateOptionIds"
-              value={option.id}
-              defaultChecked={selectedOptionIds.includes(option.id)}
-              className="mt-1 h-4 w-4"
-            />
+            <input type="checkbox" name="dateOptionIds" value={option.id} className="mt-1 h-4 w-4" />
             <div>
-              <p className="font-medium">{new Date(option.candidateDate).toLocaleString()}</p>
-              <p className="text-xs text-muted-foreground">{option.votes.length} vote(s)</p>
+              <p className="font-medium">{new Date(option.candidateDate).toLocaleString("da-DK")}</p>
+              <p className="text-xs text-muted-foreground">{option.votesCount} svar</p>
             </div>
           </label>
         ))}
@@ -61,7 +62,7 @@ export function VoteForm({ eventId, options, selectedOptionIds }: VoteFormProps)
 
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={pending}>
-          {pending ? "Saving..." : "Save vote"}
+          {pending ? "Gemmer..." : "Tilmeld / stem"}
         </Button>
         {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
       </div>

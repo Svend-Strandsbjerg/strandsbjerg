@@ -16,9 +16,10 @@ async function main() {
 
   const event = await prisma.familyEvent.create({
     data: {
-      title: "Summer weekend planning",
-      description: "Let us pick the best weekend for a family getaway.",
-      location: "West Coast",
+      title: "Sommerweekend",
+      description: null,
+      location: "Vestkysten",
+      shareToken: "demo-share-token-2026",
       createdById: familyUser.id,
       dateOptions: {
         create: [
@@ -32,7 +33,8 @@ async function main() {
 
   await prisma.vote.create({
     data: {
-      userId: familyUser.id,
+      eventId: event.id,
+      participantName: "Familie Demo User",
       dateOptionId: (await prisma.eventDateOption.findFirstOrThrow({ where: { eventId: event.id } })).id,
     },
   });

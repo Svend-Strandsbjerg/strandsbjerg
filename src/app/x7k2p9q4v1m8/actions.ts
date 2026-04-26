@@ -3,16 +3,14 @@
 import { revalidatePath } from "next/cache";
 
 import { requireFamilyAccessUser } from "@/lib/access";
-import { ensureDateOptionsMatchEvent } from "@/lib/family-votes";
-import { FAMILY_PRIVATE_BASE_PATH } from "@/lib/private-routes";
+import { createFamilyShareToken, ensureDateOptionsMatchEvent, normalizeParticipantName } from "@/lib/family-votes";
+import { FAMILY_PRIVATE_BASE_PATH, FAMILY_PUBLIC_VOTE_BASE_PATH } from "@/lib/private-routes";
 import { prisma } from "@/lib/prisma";
 
 export async function createFamilyEvent(formData: FormData) {
   const user = await requireFamilyAccessUser();
-  const userId = user.id;
 
   const title = String(formData.get("title") ?? "").trim();
-  const description = String(formData.get("description") ?? "").trim();
   const location = String(formData.get("location") ?? "").trim();
   const dateOptions = formData
     .getAll("dateOptions")
@@ -21,18 +19,19 @@ export async function createFamilyEvent(formData: FormData) {
     .map((value) => new Date(value))
     .filter((value) => !Number.isNaN(value.getTime()));
 
-  if (title.length < 3 || description.length < 10 || dateOptions.length === 0) {
+  if (!title || dateOptions.length === 0) {
     throw new Error("Invalid event payload");
   }
 
   await prisma.familyEvent.create({
     data: {
       title,
-      description,
+      description: null,
       location: location || null,
-      createdById: userId,
+      shareToken: createFamilyShareToken(),
+      createdById: user.id,
       dateOptions: {
-        create: dateOptions.map((date) => ({ candidateDate: date })),
+        create: dateOptions.map((candidateDate) => ({ candidateDate })),
       },
     },
   });
@@ -40,23 +39,30 @@ export async function createFamilyEvent(formData: FormData) {
   revalidatePath(FAMILY_PRIVATE_BASE_PATH);
 }
 
-export async function voteForEvent(formData: FormData) {
-  const user = await requireFamilyAccessUser();
-  const userId = user.id;
-
-  const eventId = String(formData.get("eventId") ?? "");
+export async function submitFamilyPublicVote(formData: FormData) {
+  const shareToken = String(formData.get("shareToken") ?? "").trim();
+  const participantName = normalizeParticipantName(String(formData.get("participantName") ?? ""));
   const selectedOptions = formData
     .getAll("dateOptionIds")
     .map((value) => String(value))
     .filter(Boolean);
 
-  if (!eventId || selectedOptions.length === 0) {
+  if (!shareToken || !participantName || selectedOptions.length === 0) {
     throw new Error("Missing vote selection");
+  }
+
+  const event = await prisma.familyEvent.findUnique({
+    where: { shareToken },
+    select: { id: true },
+  });
+
+  if (!event) {
+    throw new Error("Event not found");
   }
 
   const matchingOptionCount = await prisma.eventDateOption.count({
     where: {
-      eventId,
+      eventId: event.id,
       id: {
         in: selectedOptions,
       },
@@ -71,22 +77,22 @@ export async function voteForEvent(formData: FormData) {
   await prisma.$transaction(async (tx) => {
     await tx.vote.deleteMany({
       where: {
-        userId,
-        dateOption: {
-          eventId,
-        },
+        eventId: event.id,
+        participantName,
       },
     });
 
     await tx.vote.createMany({
       data: selectedOptions.map((dateOptionId) => ({
+        eventId: event.id,
         dateOptionId,
-        userId,
+        participantName,
       })),
       skipDuplicates: true,
     });
   });
 
-  revalidatePath(`${FAMILY_PRIVATE_BASE_PATH}/events/${eventId}`);
   revalidatePath(FAMILY_PRIVATE_BASE_PATH);
+  revalidatePath(`${FAMILY_PRIVATE_BASE_PATH}/events/${event.id}`);
+  revalidatePath(`${FAMILY_PUBLIC_VOTE_BASE_PATH}/${shareToken}`);
 }
