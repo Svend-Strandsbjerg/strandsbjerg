@@ -101,6 +101,7 @@ model User {
   investments            InvestmentEntry[]       @relation("InvestmentCreator")
   securities             Security[]              @relation("SecurityCreator")
   investmentTransactions InvestmentTransaction[] @relation("InvestmentTransactionCreator")
+  manualSecurityPrices   ManualSecurityPrice[]
   loginActivities         LoginActivity[]
   discAssessments         DiscAssessment[]
   discPromoLinks          DiscPromoLink[]          @relation("DiscPromoLinkCreator")
@@ -369,8 +370,8 @@ model InvestmentEntry {
 model Security {
   id          String       @id @default(cuid())
   name        String
-  code        String       @unique
-  isin        String?      @unique
+  code        String
+  isin        String?
   type        SecurityType
   currency    String
   provider    String?
@@ -379,11 +380,14 @@ model Security {
   createdBy   User         @relation("SecurityCreator", fields: [createdById], references: [id], onDelete: Cascade)
 
   transactions InvestmentTransaction[]
+  manualPrices ManualSecurityPrice[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([type])
+  @@unique([createdById, code])
+  @@unique([createdById, isin])
 }
 
 model InvestmentTransaction {
@@ -403,6 +407,23 @@ model InvestmentTransaction {
 
   @@index([securityId])
   @@index([transactedOn])
+}
+
+model ManualSecurityPrice {
+  id          String   @id @default(cuid())
+  securityId  String
+  price       Decimal  @db.Decimal(14, 4)
+  currency    String
+  pricedAt    DateTime
+  notes       String?
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  security    Security @relation(fields: [securityId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([createdById, securityId])
+  @@index([securityId])
 }
 
 model LoginActivity {

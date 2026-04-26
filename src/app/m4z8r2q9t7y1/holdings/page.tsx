@@ -8,8 +8,8 @@ export default async function HoldingsPage() {
 
   return (
     <section className="rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-7">
-      <h2 className="text-xl font-semibold tracking-tight">Current holdings</h2>
-      <p className="mt-1 text-sm text-muted-foreground">Aggregated positions derived from transactions and grouped by security type.</p>
+      <h2 className="text-xl font-semibold tracking-tight">Beholdninger</h2>
+      <p className="mt-1 text-sm text-muted-foreground">Aggregeret portefølje pr. ISIN med afkast baseret på seneste kurs.</p>
       <div className="mt-4">
         <HoldingsTable holdings={holdings} />
       </div>
