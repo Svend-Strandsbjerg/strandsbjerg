@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import { setUserPassword, updateUserPermissions } from "@/app/admin/users/actions";
 import { AdminAccessDenied } from "@/components/admin/admin-access-denied";
 import { canAccessAdmin, requireUser } from "@/lib/access";
@@ -73,7 +71,7 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
   });
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
+    <div className="space-y-6">
       <section className="rounded-3xl border border-border/80 bg-card p-6 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Brugeradministration</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">Brugeradministration</h1>
@@ -201,10 +199,6 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
           </table>
         </div>
       </section>
-
-      <p className="text-xs text-muted-foreground">
-        <Link href="/admin" className="underline">Tilbage til admincockpit</Link>
-      </p>
     </div>
   );
 }

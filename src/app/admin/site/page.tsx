@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import { AdminEditor } from "@/app/admin/admin-editor";
 import { AdminAccessDenied } from "@/components/admin/admin-access-denied";
 import { canAccessSiteAdmin, requireUser } from "@/lib/access";
@@ -22,10 +20,7 @@ export default async function SiteAdminPage() {
   const [homeContent, professionalContent] = await Promise.all([getHomeContent(), getProfessionalContent()]);
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <p className="text-xs text-muted-foreground">
-        <Link href="/admin" className="underline">Tilbage til admincockpit</Link>
-      </p>
+    <div className="space-y-6">
       <AdminEditor homeContent={homeContent} professionalContent={professionalContent} />
     </div>
   );

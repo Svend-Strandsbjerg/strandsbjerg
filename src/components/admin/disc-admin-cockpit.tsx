@@ -150,9 +150,11 @@ export function DiscAdminCockpit({ query, status, users, companies, diagnostics,
         </article>
       </section>
 
-      <p className="text-xs text-muted-foreground">
-        <Link href="/admin" className="underline">Tilbage til Admin</Link>
-      </p>
+      {basePath === "/disc/admin" ? (
+        <p className="text-xs text-muted-foreground">
+          <Link href="/admin" className="underline">Tilbage til Admin</Link>
+        </p>
+      ) : null}
     </div>
   );
 }
