@@ -1,7 +1,6 @@
 import Link from "next/link";
 
-import { AdminAccessDenied } from "@/components/admin/admin-access-denied";
-import { canAccessAdmin, canAccessAdminCockpit, canAccessDiscAdmin, canAccessSiteAdmin, requireUser } from "@/lib/access";
+import { canAccessAdmin, canAccessDiscAdmin, canAccessSiteAdmin, requireUser } from "@/lib/access";
 
 export const dynamic = "force-dynamic";
 
@@ -12,16 +11,6 @@ type AdminPageProps = {
 export default async function AdminPage({ searchParams }: AdminPageProps) {
   const params = searchParams ? await searchParams : undefined;
   const user = await requireUser();
-  const canUseCockpit = canAccessAdminCockpit(user);
-
-  if (!canUseCockpit) {
-    return (
-      <AdminAccessDenied
-        title="Ingen adgang til administration"
-        message="Du har ikke en administrativ rolle. Kontakt en generel admin for at få tildelt de nødvendige rettigheder."
-      />
-    );
-  }
 
   const canUseUsers = canAccessAdmin(user);
   const canUseSite = canAccessSiteAdmin(user);
@@ -30,10 +19,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const statusText = status === "adgang_nægtet" ? "Adgang nægtet: du har ikke rettigheder til den ønskede administrationsside." : null;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="space-y-6">
       <section className="rounded-3xl border border-border/80 bg-card p-6 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Administration</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight">Admincockpit</h1>
+        <h2 className="text-2xl font-semibold tracking-tight">Overblik</h2>
         <p className="mt-2 text-sm text-muted-foreground">
           Vælg administrationsområde. Generel admin kan se alt, mens specialiserede admins kun ser egne områder.
         </p>
