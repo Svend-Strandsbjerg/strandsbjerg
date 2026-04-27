@@ -11,6 +11,7 @@ import {
 } from "@/lib/access-rules";
 import { auth } from "@/lib/auth";
 import { logServerEvent } from "@/lib/logger";
+import { getSafeRedirectPath } from "@/lib/safe-redirect";
 import {
   EDIT_ACCESS_COOKIE,
   EDIT_SECRET_HEADER,
@@ -60,11 +61,13 @@ export function canAccessAdminCockpit(user?: SessionUser | null) {
   return canAccessAdminCockpitFromSubject(user);
 }
 
-export async function requireUser() {
+export async function requireUser(options?: { nextPath?: string }) {
   const session = await auth();
 
   if (!session?.user?.id) {
-    redirect("/login");
+    const nextPath = getSafeRedirectPath(options?.nextPath, "");
+    const loginPath = nextPath ? `/login?next=${encodeURIComponent(nextPath)}` : "/login";
+    redirect(loginPath);
   }
 
   return session.user;

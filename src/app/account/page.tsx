@@ -19,7 +19,7 @@ function formatApprovalStatus(status: "PENDING" | "APPROVED" | "REJECTED") {
 }
 
 export default async function AccountPage() {
-  const sessionUser = await requireUser();
+  const sessionUser = await requireUser({ nextPath: "/account" });
   const user = await prisma.user.findUnique({
     where: { id: sessionUser.id },
     select: {

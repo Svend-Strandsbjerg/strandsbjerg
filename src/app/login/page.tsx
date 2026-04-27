@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { canAccessAdminCockpit, canAccessFamily, canAccessInvestments } from "@/lib/access";
 import { auth, signIn } from "@/lib/auth";
 import { FAMILY_PRIVATE_BASE_PATH, INVESTMENTS_PRIVATE_BASE_PATH } from "@/lib/private-routes";
+import { getSafeLoginDestination, getSafeRedirectPath } from "@/lib/safe-redirect";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,12 @@ const loginErrors: Record<string, string> = {
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = searchParams ? await searchParams : undefined;
+  const getSingleParam = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
+  const requestedDestination = getSafeLoginDestination({
+    next: getSingleParam(params?.next),
+    callbackUrl: getSingleParam(params?.callbackUrl),
+    fallbackPath: "",
+  });
   const session = await auth();
   const isAuthenticated = Boolean(session?.user?.id);
   const user = session?.user;
@@ -31,6 +38,10 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const authErrorKey = !isAuthenticated ? (Array.isArray(params?.error) ? params?.error[0] : params?.error) : undefined;
 
   if (isAuthenticated && status === "APPROVED") {
+    if (requestedDestination) {
+      redirect(requestedDestination);
+    }
+
     if (canAccessAdminCockpit(user)) {
       redirect("/admin");
     }
@@ -49,21 +60,25 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       .trim()
       .toLowerCase();
     const password = String(formData.get("password") ?? "");
+    const requestedPath = getSafeRedirectPath(String(formData.get("next") ?? ""), "");
+    const loginErrorPath = requestedPath
+      ? `/login?error=invalid_credentials&next=${encodeURIComponent(requestedPath)}`
+      : "/login?error=invalid_credentials";
 
     if (!email || !password) {
-      redirect("/login?error=invalid_credentials");
+      redirect(loginErrorPath);
     }
 
     try {
       await signIn("credentials", {
         email,
         password,
-        redirectTo: "/login",
+        redirectTo: requestedPath || "/login",
       });
     } catch (error) {
       if (error instanceof AuthError) {
         if (error.type === "CredentialsSignin") {
-          redirect("/login?error=invalid_credentials");
+          redirect(loginErrorPath);
         }
       }
 
@@ -116,6 +131,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       {!isAuthenticated ? (
         <div className="space-y-3">
           <form action={credentialsSignIn} className="space-y-2">
+            <input type="hidden" name="next" value={requestedDestination} />
             <Input type="email" name="email" required placeholder="you@example.com" autoComplete="email" />
             <Input type="password" name="password" required placeholder="Password" autoComplete="current-password" />
             <Button className="w-full">Sign in with email</Button>
@@ -125,7 +141,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             <form
               action={async () => {
                 "use server";
-                await signIn("google", { redirectTo: "/login" });
+                await signIn("google", { redirectTo: requestedDestination || "/login" });
               }}
             >
               <Button className="w-full" variant="outline">
@@ -142,7 +158,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                 "use server";
                 const email = formData.get("email");
                 if (typeof email === "string" && email.includes("@")) {
-                  await signIn("resend", { email, redirectTo: "/login" });
+                  await signIn("resend", { email, redirectTo: requestedDestination || "/login" });
                 }
               }}
               className="space-y-2"
