@@ -20,9 +20,9 @@ export async function updateMyProfile(_: AccountActionState, formData: FormData)
 
     revalidatePath("/account");
 
-    return { status: "success", message: "Profile updated." };
+    return { status: "success", message: "Dine oplysninger er opdateret." };
   } catch {
-    return { status: "error", message: "Could not update profile." };
+    return { status: "error", message: "Vi kunne ikke gemme dine ændringer. Prøv igen." };
   }
 }
 
